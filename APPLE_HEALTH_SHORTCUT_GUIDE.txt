@@ -1,0 +1,22 @@
+GLP-1 HEALTH IMPORT SHORTCUT — iPHONE SETUP
+
+Tracker URL:
+https://shawntoadvine.github.io/glp1-tracker/
+
+Create a Shortcut named GLP-1 Health Import.
+
+1. Add Find Health Samples for Steps. Filter Start Date is today. Add Calculate Statistics and choose Sum.
+2. Add Find Health Samples for Apple Exercise Time. Filter Start Date is today. Add Calculate Statistics and choose Sum.
+3. Add Find Health Samples for Active Energy. Filter Start Date is today. Add Calculate Statistics and choose Sum.
+4. Add Find Health Samples for Sleep. Filter Start Date is in the last 1 day. Use only Asleep values if possible. Add Calculate Statistics and choose Sum. Convert the result to hours if needed.
+5. Add a Text action containing:
+
+https://shawntoadvine.github.io/glp1-tracker/?healthImport=1&steps=[STEPS]&exercise=[EXERCISE]&calories=[CALORIES]&sleep=[SLEEP]
+
+6. Replace each bracketed item with the matching Magic Variable from the Health actions.
+7. Add Open URLs and use the Text result.
+8. Run the Shortcut and approve Health permissions.
+
+The tracker should open, fill the fields, and autosave.
+
+Apple may label actions slightly differently depending on the iOS version.

@@ -888,7 +888,54 @@ window.clearAllData=async function(){
 }
 
 
-window.showHealthImportHelp=function(){document.getElementById('healthHelpOverlay').classList.add('show');}\nfunction importHealthFromURL(){\n  const p=new URLSearchParams(window.location.search);\n  if(p.get('healthImport')!=='1')return false;\n  const map={sleep:'sleep',steps:'steps',exercise:'exerciseMinutes',calories:'activeCalories'};\n  let imported=[];\n  Object.entries(map).forEach(([k,id])=>{const v=p.get(k);if(v!==null&&v!==''){document.getElementById(id).value=v;imported.push(id);}});\n  if(p.get('exerciseType'))document.getElementById('exerciseType').value=p.get('exerciseType');\n  else if(p.get('exercise'))document.getElementById('exerciseType').value='Apple Health';\n  if(imported.length){\n    const s=document.getElementById('healthImportStatus');if(s)s.textContent='✓ Apple Health data imported';\n    const a=document.getElementById('autosaveStatus');if(a)a.textContent='✓ Apple Health data imported and saved';\n    syncQuickChoices();updateCompletion();setTimeout(()=>autosaveNow(),300);\n  }\n  window.history.replaceState({},document.title,window.location.pathname);\n  return imported.length>0;\n}\nasync function init(){
+window.showHealthImportHelp=function(){
+  document.getElementById('healthHelpOverlay').classList.add('show');
+}
+
+function importHealthFromURL(){
+  const p=new URLSearchParams(window.location.search);
+  if(p.get('healthImport')!=='1')return false;
+
+  const map={
+    sleep:'sleep',
+    steps:'steps',
+    exercise:'exerciseMinutes',
+    calories:'activeCalories'
+  };
+
+  let imported=[];
+
+  Object.entries(map).forEach(([k,id])=>{
+    const v=p.get(k);
+    if(v!==null && v!==''){
+      document.getElementById(id).value=v;
+      imported.push(id);
+    }
+  });
+
+  if(p.get('exerciseType')){
+    document.getElementById('exerciseType').value=p.get('exerciseType');
+  }else if(p.get('exercise')){
+    document.getElementById('exerciseType').value='Apple Health';
+  }
+
+  if(imported.length){
+    const s=document.getElementById('healthImportStatus');
+    if(s)s.textContent='✓ Apple Health data imported';
+
+    const a=document.getElementById('autosaveStatus');
+    if(a)a.textContent='✓ Apple Health data imported and saved';
+
+    syncQuickChoices();
+    updateCompletion();
+    setTimeout(()=>autosaveNow(),300);
+  }
+
+  window.history.replaceState({},document.title,window.location.pathname);
+  return imported.length>0;
+}
+
+async function init(){
   buildMeals();bindQuickChoices();await openDB();document.getElementById('entryDate').value=todayISO();updateTopDate();
   document.getElementById('entryDate').addEventListener('change',e=>loadDate(e.target.value));
   await loadDate(todayISO());
@@ -897,7 +944,10 @@ window.showHealthImportHelp=function(){document.getElementById('healthHelpOverla
   syncQuickChoices();updateCompletion();
   currentLoadedDate=document.getElementById('entryDate').value;
   applySettings();
-  if(!localStorage.getItem('glp1Settings'))openSetup();
+  if(!localStorage.getItem('glp1Settings') || !localStorage.getItem('glp1SetupV6')){
+    openSetup();
+    localStorage.setItem('glp1SetupV6','shown');
+  }
   if('serviceWorker' in navigator){
     navigator.serviceWorker.register('service-worker.js').catch(()=>{});
   }
