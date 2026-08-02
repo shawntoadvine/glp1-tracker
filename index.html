@@ -118,7 +118,7 @@
         <button type="button" onclick="switchScreen('meals')"><span class="emoji">🍽️</span>Add Meal</button>
         <button type="button" onclick="switchScreen('symptoms')"><span class="emoji">❤️</span>Log Symptom</button>
         <button type="button" onclick="switchScreen('activity')"><span class="emoji">🏃</span>Add Exercise</button>
-        <button type="button" onclick="showHealthImportHelp()"><span class="emoji">⌚</span>Import Apple Health</button>
+        <button type="button" onclick="runHealthShortcut()"><span class="emoji">⌚</span>Import Apple Health</button>
       </div>
       <div class="day-badge" id="doseDayBadge">Injection timing not set</div>
       <div class="autosave-status" id="autosaveStatus">Changes save automatically.</div>
@@ -233,6 +233,7 @@
         <div><label for="exerciseMinutes">Minutes</label><input id="exerciseMinutes" type="number" placeholder="30"></div>
         <div><label for="steps">Steps</label><input id="steps" type="number" placeholder="6500"></div>
         <div><label for="activeCalories">Active calories</label><input id="activeCalories" type="number" placeholder="450"></div>
+        <div><label for="averageHeartRate">Average heart rate</label><input id="averageHeartRate" type="number" step="0.1" placeholder="bpm"></div>
       </div>
       <div style="margin-top:12px">
         <label for="activityNotes">Activity Notes</label>
@@ -240,7 +241,7 @@
       </div>
       <div class="actions">
         <button class="btn primary" onclick="saveCurrentDay()">Save Activity</button>
-        <button class="btn secondary" onclick="showHealthImportHelp()">Import from Apple Health</button>
+        <button class="btn secondary" onclick="runHealthShortcut()">Import from Apple Health</button><button class="btn secondary" onclick="showHealthImportHelp()">Shortcut Help</button>
       </div>
       <div class="autosave-status" id="healthImportStatus"></div>
     </div>
@@ -434,7 +435,7 @@ function collect(){
     injectionSite:val('injectionSite'), weight:val('weight'), sleep:val('sleep'), water:val('water'),
     hunger:val('hunger'), energy:val('energy'), generalNotes:val('generalNotes'),
     symptomNotes:val('symptomNotes'), symptoms:checkedSymptoms(),
-    exerciseType:val('exerciseType'), exerciseMinutes:val('exerciseMinutes'), steps:val('steps'), activeCalories:val('activeCalories'),
+    exerciseType:val('exerciseType'), exerciseMinutes:val('exerciseMinutes'), steps:val('steps'), activeCalories:val('activeCalories'), averageHeartRate:val('averageHeartRate'),
     activityNotes:val('activityNotes'), meals:{}
   };
   mealNames.forEach(m=>e.meals[m]={
@@ -447,7 +448,7 @@ function collect(){
 }
 function setVal(id,v){document.getElementById(id).value=v||''}
 function populate(e){
-  ['entryDate','dose','injectionTime','injectionSite','weight','sleep','water','hunger','energy','generalNotes','symptomNotes','exerciseType','exerciseMinutes','steps','activeCalories','activityNotes'].forEach(id=>setVal(id,e[id]));
+  ['entryDate','dose','injectionTime','injectionSite','weight','sleep','water','hunger','energy','generalNotes','symptomNotes','exerciseType','exerciseMinutes','steps','activeCalories','averageHeartRate','activityNotes'].forEach(id=>setVal(id,e[id]));
   const s=new Set(e.symptoms||[]);document.querySelectorAll('#symptomChips input').forEach(x=>x.checked=s.has(x.value));
   mealNames.forEach(m=>{
     const d=e.meals?.[m]||{};
@@ -823,9 +824,9 @@ document.querySelectorAll('.nav-btn').forEach(b=>b.addEventListener('click',()=>
 function download(name,content,type){const a=document.createElement('a'),u=URL.createObjectURL(new Blob([content],{type}));a.href=u;a.download=name;a.click();URL.revokeObjectURL(u)}
 window.exportJSON=async function(){download('glp1_tracker_backup.json',JSON.stringify(await getAll(),null,2),'application/json')}
 window.exportCSV=async function(){
-  const rows=await getAll(),header=['date','weight','dose','sleep','water','hunger','energy','symptoms','exerciseType','exerciseMinutes','steps','activeCalories','generalNotes'];
+  const rows=await getAll(),header=['date','weight','dose','sleep','water','hunger','energy','symptoms','exerciseType','exerciseMinutes','steps','activeCalories','averageHeartRate','generalNotes'];
   const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
-  download('glp1_tracker_export.csv',[header.join(','),...rows.map(e=>[e.date,e.weight,e.dose,e.sleep,e.water,e.hunger,e.energy,(e.symptoms||[]).join('; '),e.exerciseType,e.exerciseMinutes,e.steps,e.activeCalories,e.generalNotes].map(q).join(','))].join('\n'),'text/csv');
+  download('glp1_tracker_export.csv',[header.join(','),...rows.map(e=>[e.date,e.weight,e.dose,e.sleep,e.water,e.hunger,e.energy,(e.symptoms||[]).join('; '),e.exerciseType,e.exerciseMinutes,e.steps,e.activeCalories,e.averageHeartRate,e.generalNotes].map(q).join(','))].join('\n'),'text/csv');
 }
 
 function estimateBytes(obj){
@@ -888,6 +889,13 @@ window.clearAllData=async function(){
 }
 
 
+window.runHealthShortcut=function(){
+  const shortcutName=encodeURIComponent('GLP-1 Health Import');
+  const status=document.getElementById('healthImportStatus');
+  if(status)status.textContent='Opening GLP-1 Health Import…';
+  window.location.href=`shortcuts://run-shortcut?name=${shortcutName}`;
+}
+
 window.showHealthImportHelp=function(){
   document.getElementById('healthHelpOverlay').classList.add('show');
 }
@@ -900,7 +908,8 @@ function importHealthFromURL(){
     sleep:'sleep',
     steps:'steps',
     exercise:'exerciseMinutes',
-    calories:'activeCalories'
+    calories:'activeCalories',
+    heartRate:'averageHeartRate'
   };
 
   let imported=[];
