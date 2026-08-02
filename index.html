@@ -85,10 +85,11 @@
     .progress-wrap{background:#e5e7eb;border-radius:999px;height:10px;overflow:hidden;margin-top:8px}
     .progress-bar{height:100%;background:var(--accent);width:0%;transition:.2s}
     .tiny{font-size:.82rem;color:var(--muted)}
-    .quick-home{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+    .quick-home{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.quick-home button:last-child{grid-column:1/-1}
     .quick-home button{min-height:78px;border:1px solid var(--line);border-radius:16px;background:#fff;font-weight:800;font-size:1rem}
     .quick-home .emoji{display:block;font-size:1.55rem;margin-bottom:4px}
     .autosave-status{font-size:.84rem;color:var(--muted);margin-top:8px;min-height:1.2em}
+    .saved-label{display:inline-flex;align-items:center;gap:5px;color:#166534;font-weight:750;font-size:.86rem;margin-top:5px}
     .setup-overlay{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:100;display:none;align-items:center;justify-content:center;padding:18px}
     .setup-overlay.show{display:flex}
     .setup-card{max-width:460px;width:100%;background:#fff;border-radius:22px;padding:18px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
@@ -117,6 +118,7 @@
         <button type="button" onclick="switchScreen('meals')"><span class="emoji">🍽️</span>Add Meal</button>
         <button type="button" onclick="switchScreen('symptoms')"><span class="emoji">❤️</span>Log Symptom</button>
         <button type="button" onclick="switchScreen('activity')"><span class="emoji">🏃</span>Add Exercise</button>
+        <button type="button" onclick="showHealthImportHelp()"><span class="emoji">⌚</span>Import Apple Health</button>
       </div>
       <div class="day-badge" id="doseDayBadge">Injection timing not set</div>
       <div class="autosave-status" id="autosaveStatus">Changes save automatically.</div>
@@ -190,7 +192,7 @@
       Open one meal at a time. Take a photo, copy the ChatGPT prompt, attach the same photo in ChatGPT, and paste the result back here. The photo is removed from the tracker after you save.
     </div>
     <div class="meal-list" id="mealList"></div>
-    <div class="actions"><button class="btn primary" onclick="saveCurrentDay()">Save Meals</button></div>
+    <div class="actions"><button class="btn primary" onclick="saveAllMealsAndClose()">Save All Meals</button></div>
   </section>
 
   <section id="symptoms" class="screen">
@@ -230,12 +232,17 @@
         <div><label for="exerciseType">Activity</label><input id="exerciseType" type="text" placeholder="Walk, bike, weights"></div>
         <div><label for="exerciseMinutes">Minutes</label><input id="exerciseMinutes" type="number" placeholder="30"></div>
         <div><label for="steps">Steps</label><input id="steps" type="number" placeholder="6500"></div>
+        <div><label for="activeCalories">Active calories</label><input id="activeCalories" type="number" placeholder="450"></div>
       </div>
       <div style="margin-top:12px">
         <label for="activityNotes">Activity Notes</label>
         <textarea id="activityNotes" placeholder="How it felt, intensity, distance, soreness, etc."></textarea>
       </div>
-      <div class="actions"><button class="btn primary" onclick="saveCurrentDay()">Save Activity</button></div>
+      <div class="actions">
+        <button class="btn primary" onclick="saveCurrentDay()">Save Activity</button>
+        <button class="btn secondary" onclick="showHealthImportHelp()">Import from Apple Health</button>
+      </div>
+      <div class="autosave-status" id="healthImportStatus"></div>
     </div>
   </section>
 
@@ -277,6 +284,15 @@
       </div>
     </div>
   </section>
+</div>
+
+<div class="setup-overlay" id="healthHelpOverlay">
+  <div class="setup-card">
+    <h2>Import Apple Health</h2>
+    <div class="muted">Run the <strong>GLP-1 Health Import</strong> Shortcut. It will read today’s Health data and reopen this tracker with sleep, steps, exercise minutes, and active calories filled in.</div>
+    <div class="section-note" style="margin-top:12px">After setup, this becomes a one-tap import. You can also ask Siri to run “GLP-1 Health Import.”</div>
+    <div class="actions"><button class="btn secondary" onclick="document.getElementById('healthHelpOverlay').classList.remove('show')">Close</button></div>
+  </div>
 </div>
 
 <div class="setup-overlay" id="setupOverlay">
@@ -370,10 +386,11 @@ function buildMeals(){
         <div class="ai-box">
           <h4>ChatGPT Meal Analysis</h4>
           <div class="actions">
-            <button class="btn small primary" onclick="copyMealPrompt('${meal}')">Copy Prompt</button>
-            <button class="btn small secondary" onclick="openChatGPT()">Open ChatGPT</button>
+            <button class="btn small primary" onclick="shareMealWithChatGPT('${meal}')">Share Photo + Prompt</button>
+            <button class="btn small secondary" onclick="copyMealPrompt('${meal}')">Copy Prompt Only</button>
           </div>
           <div class="status" id="${meal}_status"></div>
+          <div class="tiny">On iPhone, choose ChatGPT from the Share Sheet. If it is not shown, tap More.</div>
           <div class="grid two" style="margin-top:10px">
             <div><label>Calories</label><input id="${meal}_calories" type="number"></div>
             <div><label>Protein (g)</label><input id="${meal}_protein" type="number"></div>
@@ -383,6 +400,9 @@ function buildMeals(){
           <div style="margin-top:10px"><label>Paste ChatGPT analysis</label><textarea id="${meal}_airesult"></textarea></div>
         </div>
         <div style="margin-top:10px"><label>Meal notes</label><textarea id="${meal}_notes"></textarea></div>
+        <div class="actions">
+          <button type="button" class="btn primary" onclick="saveAndCloseMeal('${meal}')">Save ${mealTitles[meal]}</button>
+        </div>
       </div>
     </div>`).join('');
   mealNames.forEach(bindPhoto);
@@ -414,7 +434,7 @@ function collect(){
     injectionSite:val('injectionSite'), weight:val('weight'), sleep:val('sleep'), water:val('water'),
     hunger:val('hunger'), energy:val('energy'), generalNotes:val('generalNotes'),
     symptomNotes:val('symptomNotes'), symptoms:checkedSymptoms(),
-    exerciseType:val('exerciseType'), exerciseMinutes:val('exerciseMinutes'), steps:val('steps'),
+    exerciseType:val('exerciseType'), exerciseMinutes:val('exerciseMinutes'), steps:val('steps'), activeCalories:val('activeCalories'),
     activityNotes:val('activityNotes'), meals:{}
   };
   mealNames.forEach(m=>e.meals[m]={
@@ -427,7 +447,7 @@ function collect(){
 }
 function setVal(id,v){document.getElementById(id).value=v||''}
 function populate(e){
-  ['entryDate','dose','injectionTime','injectionSite','weight','sleep','water','hunger','energy','generalNotes','symptomNotes','exerciseType','exerciseMinutes','steps','activityNotes'].forEach(id=>setVal(id,e[id]));
+  ['entryDate','dose','injectionTime','injectionSite','weight','sleep','water','hunger','energy','generalNotes','symptomNotes','exerciseType','exerciseMinutes','steps','activeCalories','activityNotes'].forEach(id=>setVal(id,e[id]));
   const s=new Set(e.symptoms||[]);document.querySelectorAll('#symptomChips input').forEach(x=>x.checked=s.has(x.value));
   mealNames.forEach(m=>{
     const d=e.meals?.[m]||{};
@@ -450,9 +470,64 @@ function clearForm(){
   mealNames.forEach(m=>{const p=document.getElementById(m+'_preview');p.src='';p.dataset.image='';p.style.display='none';updateMealSummary(m)});
   document.getElementById('entryDate').value=todayISO();updateTopDate();syncQuickChoices();updateCompletion();
 }
+
+window.saveAndCloseMeal=async function(meal){
+  await autosaveNow();
+  updateMealSummary(meal);
+
+  const editor=document.getElementById(meal+'_editor');
+  if(editor)editor.classList.remove('open');
+
+  const card=editor?.closest('.meal-summary');
+  if(card){
+    const openBtn=[...card.querySelectorAll('button')].find(b=>b.textContent==='Close');
+    if(openBtn)openBtn.textContent='Open';
+  }
+
+  const status=document.getElementById(meal+'_status');
+  if(status)status.textContent='Meal saved ✓';
+
+  showSaved();
+
+  setTimeout(()=>{
+    if(status && status.textContent==='Meal saved ✓')status.textContent='';
+  },1800);
+
+  const summary=document.getElementById(meal+'_summary');
+  if(summary){
+    window.scrollTo({
+      top:summary.getBoundingClientRect().top + window.scrollY - 120,
+      behavior:'smooth'
+    });
+  }
+}
+
+window.saveAllMealsAndClose=async function(){
+  await saveCurrentDay();
+
+  mealNames.forEach(meal=>{
+    const editor=document.getElementById(meal+'_editor');
+    if(editor)editor.classList.remove('open');
+    updateMealSummary(meal);
+  });
+
+  document.querySelectorAll('.meal-summary .btn.secondary').forEach(btn=>{
+    if(btn.textContent==='Close')btn.textContent='Open';
+  });
+
+  showSaved();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
 function updateMealSummary(m){
   const d=val(m+'_desc'), c=val(m+'_calories');
-  document.getElementById(m+'_summary').textContent=d?(d+(c?' · '+c+' cal':'')):'Nothing logged';
+  const el=document.getElementById(m+'_summary');
+
+  if(d){
+    el.innerHTML=`${d}${c?' · '+c+' cal':''}<div class="saved-label">✓ Saved</div>`;
+  }else{
+    el.textContent='Nothing logged';
+  }
 }
 async function loadDate(date){const e=await getEntry(date);if(e)populate(e);else{clearFormNoConfirm();document.getElementById('entryDate').value=date;updateTopDate()}}
 function clearFormNoConfirm(){
@@ -644,8 +719,8 @@ window.saveCurrentDay=async function(){
 }
 function showSaved(){const b=document.getElementById('saveBanner');b.classList.add('show');setTimeout(()=>b.classList.remove('show'),1200)}
 
-window.copyMealPrompt=async function(meal){
-  const prompt=`Analyze the attached ${meal==='snacks'?'snack or drink':meal} photo for my GLP-1 food tracker.
+function buildMealPrompt(meal){
+  return `Analyze the attached ${meal==='snacks'?'snack or drink':meal} photo for my GLP-1 food tracker.
 
 Please provide:
 1. Each visible food or drink
@@ -662,10 +737,65 @@ Known details:
 - Approximate amount: ${val(meal+'_amount')||'Not entered'}
 
 Use realistic ranges rather than pretending the photo gives an exact measurement. Finish with a compact summary I can paste into my tracker.`;
-  try{await navigator.clipboard.writeText(prompt)}catch(e){const t=document.createElement('textarea');t.value=prompt;document.body.appendChild(t);t.select();document.execCommand('copy');t.remove()}
-  document.getElementById(meal+'_status').textContent='Prompt copied. Attach this photo in ChatGPT.';
 }
-window.openChatGPT=function(){window.open('https://chatgpt.com/','_blank')}
+
+function dataUrlToFile(dataUrl, filename){
+  const parts=dataUrl.split(',');
+  const mime=(parts[0].match(/:(.*?);/)||[])[1]||'image/jpeg';
+  const binary=atob(parts[1]);
+  const bytes=new Uint8Array(binary.length);
+  for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+  return new File([bytes],filename,{type:mime});
+}
+
+window.shareMealWithChatGPT=async function(meal){
+  const preview=document.getElementById(meal+'_preview');
+  const dataUrl=preview.dataset.image||'';
+  const status=document.getElementById(meal+'_status');
+
+  if(!dataUrl){
+    status.textContent='Take or choose a meal photo first.';
+    return;
+  }
+
+  const prompt=buildMealPrompt(meal);
+  const file=dataUrlToFile(dataUrl,`${meal}-${todayISO()}.jpg`);
+
+  try{
+    if(navigator.share && (!navigator.canShare || navigator.canShare({files:[file]}))){
+      await navigator.share({
+        title:'Analyze my meal',
+        text:prompt,
+        files:[file]
+      });
+      status.textContent='Shared. Choose ChatGPT and send the meal.';
+    }else{
+      await navigator.clipboard.writeText(prompt);
+      status.textContent='Photo sharing is unavailable here. The prompt was copied.';
+    }
+  }catch(err){
+    if(err && err.name==='AbortError'){
+      status.textContent='Sharing canceled.';
+      return;
+    }
+    try{await navigator.clipboard.writeText(prompt)}catch(e){}
+    status.textContent='Could not share both items. The prompt was copied as a fallback.';
+  }
+}
+
+window.copyMealPrompt=async function(meal){
+  const prompt=buildMealPrompt(meal);
+  try{await navigator.clipboard.writeText(prompt)}
+  catch(e){
+    const t=document.createElement('textarea');
+    t.value=prompt;
+    document.body.appendChild(t);
+    t.select();
+    document.execCommand('copy');
+    t.remove();
+  }
+  document.getElementById(meal+'_status').textContent='Prompt copied.';
+}
 
 async function renderHistory(){
   const items=(await getAll()).sort((a,b)=>b.date.localeCompare(a.date)),h=document.getElementById('historyList');
@@ -693,9 +823,9 @@ document.querySelectorAll('.nav-btn').forEach(b=>b.addEventListener('click',()=>
 function download(name,content,type){const a=document.createElement('a'),u=URL.createObjectURL(new Blob([content],{type}));a.href=u;a.download=name;a.click();URL.revokeObjectURL(u)}
 window.exportJSON=async function(){download('glp1_tracker_backup.json',JSON.stringify(await getAll(),null,2),'application/json')}
 window.exportCSV=async function(){
-  const rows=await getAll(),header=['date','weight','dose','sleep','water','hunger','energy','symptoms','exerciseType','exerciseMinutes','steps','generalNotes'];
+  const rows=await getAll(),header=['date','weight','dose','sleep','water','hunger','energy','symptoms','exerciseType','exerciseMinutes','steps','activeCalories','generalNotes'];
   const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
-  download('glp1_tracker_export.csv',[header.join(','),...rows.map(e=>[e.date,e.weight,e.dose,e.sleep,e.water,e.hunger,e.energy,(e.symptoms||[]).join('; '),e.exerciseType,e.exerciseMinutes,e.steps,e.generalNotes].map(q).join(','))].join('\n'),'text/csv');
+  download('glp1_tracker_export.csv',[header.join(','),...rows.map(e=>[e.date,e.weight,e.dose,e.sleep,e.water,e.hunger,e.energy,(e.symptoms||[]).join('; '),e.exerciseType,e.exerciseMinutes,e.steps,e.activeCalories,e.generalNotes].map(q).join(','))].join('\n'),'text/csv');
 }
 
 function estimateBytes(obj){
@@ -758,10 +888,11 @@ window.clearAllData=async function(){
 }
 
 
-async function init(){
+window.showHealthImportHelp=function(){document.getElementById('healthHelpOverlay').classList.add('show');}\nfunction importHealthFromURL(){\n  const p=new URLSearchParams(window.location.search);\n  if(p.get('healthImport')!=='1')return false;\n  const map={sleep:'sleep',steps:'steps',exercise:'exerciseMinutes',calories:'activeCalories'};\n  let imported=[];\n  Object.entries(map).forEach(([k,id])=>{const v=p.get(k);if(v!==null&&v!==''){document.getElementById(id).value=v;imported.push(id);}});\n  if(p.get('exerciseType'))document.getElementById('exerciseType').value=p.get('exerciseType');\n  else if(p.get('exercise'))document.getElementById('exerciseType').value='Apple Health';\n  if(imported.length){\n    const s=document.getElementById('healthImportStatus');if(s)s.textContent='✓ Apple Health data imported';\n    const a=document.getElementById('autosaveStatus');if(a)a.textContent='✓ Apple Health data imported and saved';\n    syncQuickChoices();updateCompletion();setTimeout(()=>autosaveNow(),300);\n  }\n  window.history.replaceState({},document.title,window.location.pathname);\n  return imported.length>0;\n}\nasync function init(){
   buildMeals();bindQuickChoices();await openDB();document.getElementById('entryDate').value=todayISO();updateTopDate();
   document.getElementById('entryDate').addEventListener('change',e=>loadDate(e.target.value));
   await loadDate(todayISO());
+  importHealthFromURL();
   await updateStorageInfo();
   syncQuickChoices();updateCompletion();
   currentLoadedDate=document.getElementById('entryDate').value;
