@@ -1,0 +1,777 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>GLP-1 Tracker</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="GLP-1 Tracker">
+  <meta name="theme-color" content="#2563eb">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <style>
+    :root {
+      --bg:#f5f7fb; --card:#fff; --text:#1f2937; --muted:#6b7280;
+      --line:#dbe2ea; --accent:#2563eb; --accent-soft:#e8f0ff;
+      --success:#0f766e; --danger:#b91c1c; --shadow:0 8px 24px rgba(17,24,39,.08);
+      --radius:18px;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+    body{padding-bottom:92px}
+    .app{max-width:760px;margin:0 auto;padding:14px 12px 28px}
+    .topbar{
+      position:sticky;top:0;z-index:20;background:rgba(245,247,251,.94);backdrop-filter:blur(14px);
+      padding:10px 2px 12px;
+    }
+    .title-row{display:flex;justify-content:space-between;align-items:center;gap:12px}
+    h1{font-size:1.55rem;margin:0}
+    .date-pill{font-size:.9rem;color:var(--muted);background:#fff;border:1px solid var(--line);padding:8px 10px;border-radius:999px}
+    .screen{display:none}
+    .screen.active{display:block}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:15px;margin-bottom:14px}
+    .card h2{margin:0 0 12px;font-size:1.12rem}
+    .grid{display:grid;gap:11px}
+    .two{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+    label{display:block;font-weight:650;font-size:.9rem;margin-bottom:6px}
+    input,select,textarea,button{font:inherit}
+    input[type=text],input[type=date],input[type=time],input[type=number],select,textarea{
+      width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--text)
+    }
+    textarea{min-height:88px;resize:vertical}
+    .muted{color:var(--muted);font-size:.9rem;line-height:1.4}
+    .btn{border:0;border-radius:12px;padding:11px 14px;font-weight:750;cursor:pointer}
+    .primary{background:var(--accent);color:#fff}
+    .secondary{background:#eef2f7;color:var(--text)}
+    .success{background:#dcfce7;color:#166534}
+    .danger{background:#fee2e2;color:#991b1b}
+    .small{padding:8px 10px;font-size:.88rem}
+    .actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}
+    .chips{display:flex;flex-wrap:wrap;gap:8px}
+    .chip{display:inline-flex;align-items:center;gap:7px;padding:9px 11px;border:1px solid var(--line);border-radius:999px;background:#fff;font-size:.91rem}
+    .meal-list{display:grid;gap:12px}
+    .meal-summary{border:1px solid var(--line);border-radius:16px;background:#fff;padding:13px}
+    .meal-summary-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+    .meal-summary h3{margin:0;font-size:1.03rem}
+    .meal-editor{display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+    .meal-editor.open{display:block}
+    .preview{width:100%;max-height:230px;object-fit:cover;border-radius:12px;border:1px solid var(--line);margin-top:10px;display:none}
+    .ai-box{margin-top:12px;padding:12px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:14px}
+    .ai-box h4{margin:0 0 8px}
+    .status{min-height:1.2em;margin-top:7px;font-size:.88rem;color:var(--success)}
+    .history-item{border:1px solid var(--line);border-radius:16px;background:#fff;padding:13px;margin-bottom:11px}
+    .history-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+    .history-date{font-weight:800;margin-bottom:5px}
+    .empty{text-align:center;color:var(--muted);padding:18px;border:1px dashed var(--line);border-radius:16px}
+    .bottom-nav{
+      position:fixed;left:0;right:0;bottom:0;z-index:30;background:rgba(255,255,255,.96);
+      backdrop-filter:blur(16px);border-top:1px solid var(--line);padding:7px max(8px,env(safe-area-inset-right)) calc(7px + env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));
+      display:grid;grid-template-columns:repeat(5,1fr);gap:4px
+    }
+    .nav-btn{border:0;background:transparent;border-radius:12px;padding:8px 3px;color:var(--muted);font-size:.74rem;font-weight:700}
+    .nav-btn .icon{display:block;font-size:1.22rem;margin-bottom:2px}
+    .nav-btn.active{background:var(--accent-soft);color:var(--accent)}
+    .save-banner{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:#111827;color:#fff;padding:10px 14px;border-radius:999px;opacity:0;pointer-events:none;transition:.2s;z-index:40}
+    .save-banner.show{opacity:1}
+    .section-note{background:#fff8e6;border:1px solid #f0dfaa;border-radius:14px;padding:11px 12px;font-size:.9rem;line-height:1.4;margin-bottom:12px}
+    .counter{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#f8fafc;border:1px solid var(--line);border-radius:16px;padding:12px}
+    .counter-value{font-size:1.7rem;font-weight:800;min-width:74px;text-align:center}
+    .round-btn{width:46px;height:46px;border:0;border-radius:50%;font-size:1.5rem;font-weight:800;background:var(--accent);color:#fff}
+    .quick-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}
+    .quick-btn{border:1px solid var(--line);border-radius:14px;background:#fff;padding:13px 10px;font-weight:700;text-align:center}
+    .quick-btn.selected{background:var(--accent-soft);border-color:#93c5fd;color:var(--accent)}
+    .progress-wrap{background:#e5e7eb;border-radius:999px;height:10px;overflow:hidden;margin-top:8px}
+    .progress-bar{height:100%;background:var(--accent);width:0%;transition:.2s}
+    .tiny{font-size:.82rem;color:var(--muted)}
+    .quick-home{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+    .quick-home button{min-height:78px;border:1px solid var(--line);border-radius:16px;background:#fff;font-weight:800;font-size:1rem}
+    .quick-home .emoji{display:block;font-size:1.55rem;margin-bottom:4px}
+    .autosave-status{font-size:.84rem;color:var(--muted);margin-top:8px;min-height:1.2em}
+    .setup-overlay{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:100;display:none;align-items:center;justify-content:center;padding:18px}
+    .setup-overlay.show{display:flex}
+    .setup-card{max-width:460px;width:100%;background:#fff;border-radius:22px;padding:18px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+    .setup-card h2{margin:0 0 8px}
+    .setup-card .actions{justify-content:flex-end}
+    .day-badge{display:inline-flex;align-items:center;gap:6px;background:#eef2ff;color:#3730a3;border-radius:999px;padding:7px 10px;font-size:.84rem;font-weight:750;margin-top:8px}
+    .undo-toast{position:fixed;left:50%;bottom:100px;transform:translateX(-50%);background:#111827;color:#fff;border-radius:999px;padding:10px 14px;z-index:50;display:none;gap:10px;align-items:center}
+    .undo-toast.show{display:flex}
+    .undo-toast button{border:0;background:#fff;color:#111827;border-radius:999px;padding:5px 9px;font-weight:700}
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="title-row">
+      <h1 id="screenTitle">Today</h1>
+      <div class="date-pill" id="topDate"></div>
+    </div>
+  </div>
+
+  <section id="today" class="screen active">
+    <div class="card">
+      <h2>Quick Add</h2>
+      <div class="quick-home">
+        <button type="button" onclick="quickWater()"><span class="emoji">💧</span>Add Water</button>
+        <button type="button" onclick="switchScreen('meals')"><span class="emoji">🍽️</span>Add Meal</button>
+        <button type="button" onclick="switchScreen('symptoms')"><span class="emoji">❤️</span>Log Symptom</button>
+        <button type="button" onclick="switchScreen('activity')"><span class="emoji">🏃</span>Add Exercise</button>
+      </div>
+      <div class="day-badge" id="doseDayBadge">Injection timing not set</div>
+      <div class="autosave-status" id="autosaveStatus">Changes save automatically.</div>
+    </div>
+    <div class="card">
+      <h2>Today’s Progress</h2>
+      <div class="muted" id="completionText">0% complete</div>
+      <div class="progress-wrap"><div class="progress-bar" id="completionBar"></div></div>
+    </div>
+    <div class="card">
+      <h2>Daily Overview</h2>
+      <div class="grid two">
+        <div><label for="entryDate">Date</label><input id="entryDate" type="date"></div>
+        <div><label for="dose">GLP-1 Dose</label><input id="dose" type="text" placeholder="Example: 0.25 mg"></div>
+        <div><label for="injectionTime">Injection Time</label><input id="injectionTime" type="time"></div>
+        <div>
+          <label for="injectionSite">Injection Site</label>
+          <select id="injectionSite">
+            <option value="">Select site</option><option>Abdomen</option><option>Left thigh</option><option>Right thigh</option>
+            <option>Left arm</option><option>Right arm</option><option>Other</option>
+          </select>
+        </div>
+        <div><label for="weight">Weight</label><input id="weight" type="number" step="0.1" placeholder="lbs"></div>
+        <div><label for="sleep">Sleep</label><input id="sleep" type="number" step="0.1" placeholder="hours"></div>
+        <div>
+  <label>Water</label>
+  <div class="counter">
+    <button type="button" class="round-btn" onclick="changeCounter('water',-1)">−</button>
+    <div>
+      <div class="counter-value"><span id="waterDisplay">0</span></div>
+      <div class="tiny" id="waterUnitLabel">glasses</div>
+    </div>
+    <button type="button" class="round-btn" onclick="changeCounter('water',1)">+</button>
+  </div>
+  <input id="water" type="hidden" value="0">
+</div>
+        <div>
+  <label>Hunger right now</label>
+  <div class="quick-grid" data-choice="hunger">
+    <button type="button" class="quick-btn" data-value="2">Not hungry</button>
+    <button type="button" class="quick-btn" data-value="5">A little hungry</button>
+    <button type="button" class="quick-btn" data-value="8">Hungry</button>
+    <button type="button" class="quick-btn" data-value="10">Very hungry</button>
+  </div>
+  <input id="hunger" type="hidden">
+</div>
+        <div>
+  <label>Energy</label>
+  <div class="quick-grid" data-choice="energy">
+    <button type="button" class="quick-btn" data-value="2">Very low</button>
+    <button type="button" class="quick-btn" data-value="5">Okay</button>
+    <button type="button" class="quick-btn" data-value="8">Good</button>
+    <button type="button" class="quick-btn" data-value="10">Excellent</button>
+  </div>
+  <input id="energy" type="hidden">
+</div>
+      </div>
+      <div class="actions">
+        <button class="btn primary" onclick="saveCurrentDay()">Save Today</button>
+        <button class="btn secondary" onclick="clearForm()">Clear</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>General Notes</h2>
+      <textarea id="generalNotes" placeholder="Anything important about today"></textarea>
+    </div>
+  </section>
+
+  <section id="meals" class="screen">
+    <div class="section-note">
+      Open one meal at a time. Take a photo, copy the ChatGPT prompt, attach the same photo in ChatGPT, and paste the result back here. The photo is removed from the tracker after you save.
+    </div>
+    <div class="meal-list" id="mealList"></div>
+    <div class="actions"><button class="btn primary" onclick="saveCurrentDay()">Save Meals</button></div>
+  </section>
+
+  <section id="symptoms" class="screen">
+    <div class="card">
+      <h2>Health Changes</h2>
+      <div class="chips" id="symptomChips">
+        <label class="chip"><input type="checkbox" value="Nausea"> Nausea</label>
+        <label class="chip"><input type="checkbox" value="Constipation"> Constipation</label>
+        <label class="chip"><input type="checkbox" value="Diarrhea"> Diarrhea</label>
+        <label class="chip"><input type="checkbox" value="Headache"> Headache</label>
+        <label class="chip"><input type="checkbox" value="Fatigue"> Fatigue</label>
+        <label class="chip"><input type="checkbox" value="Heartburn"> Heartburn</label>
+        <label class="chip"><input type="checkbox" value="Bloating"> Bloating</label>
+        <label class="chip"><input type="checkbox" value="Reduced appetite"> Reduced appetite</label>
+      </div>
+      <div style="margin-top:12px">
+        <label for="symptomNotes">Symptom Notes</label>
+        <textarea id="symptomNotes" placeholder="Severity, timing, how long it lasted, and anything unusual"></textarea>
+      </div>
+      <div class="actions"><button class="btn primary" onclick="saveCurrentDay()">Save Symptoms</button></div>
+    </div>
+  </section>
+
+  <section id="activity" class="screen">
+    <div class="card">
+      <h2>Exercise & Movement</h2>
+      <div>
+        <label>Quick activity</label>
+        <div class="quick-grid" id="activityQuick">
+          <button type="button" class="quick-btn" onclick="setActivity('Walk',10)">10-minute walk</button>
+          <button type="button" class="quick-btn" onclick="setActivity('Walk',20)">20-minute walk</button>
+          <button type="button" class="quick-btn" onclick="setActivity('Weights',30)">30-minute weights</button>
+          <button type="button" class="quick-btn" onclick="setActivity('Other',15)">Other activity</button>
+        </div>
+      </div>
+      <div class="grid two" style="margin-top:12px">
+        <div><label for="exerciseType">Activity</label><input id="exerciseType" type="text" placeholder="Walk, bike, weights"></div>
+        <div><label for="exerciseMinutes">Minutes</label><input id="exerciseMinutes" type="number" placeholder="30"></div>
+        <div><label for="steps">Steps</label><input id="steps" type="number" placeholder="6500"></div>
+      </div>
+      <div style="margin-top:12px">
+        <label for="activityNotes">Activity Notes</label>
+        <textarea id="activityNotes" placeholder="How it felt, intensity, distance, soreness, etc."></textarea>
+      </div>
+      <div class="actions"><button class="btn primary" onclick="saveCurrentDay()">Save Activity</button></div>
+    </div>
+  </section>
+
+  <section id="history" class="screen">
+    <div class="card">
+      <h2>Saved Days</h2>
+      <div id="historyList" class="empty">No saved days yet.</div>
+    </div>
+    <div class="card">
+      <h2>Backup & Storage</h2>
+      <div class="muted" id="storageInfo">Calculating storage...</div>
+      <div class="actions">
+        <button class="btn success" onclick="exportCSV()">Export CSV</button>
+        <button class="btn secondary" onclick="exportJSON()">Full Backup</button>
+        <button class="btn secondary" onclick="restoreJSON()">Restore Backup</button><button class="btn secondary" onclick="openSetup()">Settings</button>
+      </div>
+      <input id="restoreFile" type="file" accept=".json,application/json" style="display:none">
+    </div>
+    <div class="card">
+      <h2>Archive & Clear</h2>
+      <div class="muted">
+        Export your data first, then remove older saved days to free space. Meal photos are automatically removed after saving.
+      </div>
+      <div class="grid two" style="margin-top:12px">
+        <div>
+          <label for="keepDays">Keep most recent</label>
+          <select id="keepDays">
+            <option value="7">7 days</option>
+            <option value="14">14 days</option>
+            <option value="30" selected>30 days</option>
+            <option value="60">60 days</option>
+            <option value="90">90 days</option>
+          </select>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn danger" onclick="archiveAndClear()">Export & Clear Older Data</button>
+        <button class="btn danger" onclick="clearAllData()">Delete All Saved Data</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="setup-overlay" id="setupOverlay">
+  <div class="setup-card">
+    <h2>Set up your tracker</h2>
+    <div class="muted" style="margin-bottom:12px">You only need to do this once. You can change these settings later from History.</div>
+    <div class="grid two">
+      <div>
+        <label for="setupWaterOz">One water tap equals</label>
+        <select id="setupWaterOz">
+          <option value="8">8 oz glass</option>
+          <option value="12">12 oz glass</option>
+          <option value="16">16 oz bottle</option>
+          <option value="20">20 oz bottle</option>
+        </select>
+      </div>
+      <div>
+        <label for="setupWeightUnit">Weight unit</label>
+        <select id="setupWeightUnit">
+          <option value="lb">Pounds</option>
+          <option value="kg">Kilograms</option>
+        </select>
+      </div>
+      <div>
+        <label for="setupInjectionDay">Usual injection day</label>
+        <select id="setupInjectionDay">
+          <option value="">Not sure / varies</option>
+          <option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option>
+          <option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option>
+        </select>
+      </div>
+    </div>
+    <div class="actions"><button class="btn primary" onclick="saveSetup()">Save Setup</button></div>
+  </div>
+</div>
+
+<div class="undo-toast" id="undoToast"><span id="undoText">Water added</span><button onclick="undoLastAction()">Undo</button></div>
+
+<div class="bottom-nav">
+  <button class="nav-btn active" data-screen="today"><span class="icon">🏠</span>Today</button>
+  <button class="nav-btn" data-screen="meals"><span class="icon">🍽️</span>Meals</button>
+  <button class="nav-btn" data-screen="symptoms"><span class="icon">❤️</span>Symptoms</button>
+  <button class="nav-btn" data-screen="activity"><span class="icon">🏃</span>Activity</button>
+  <button class="nav-btn" data-screen="history"><span class="icon">📅</span>History</button>
+</div>
+
+<div class="save-banner" id="saveBanner">Saved</div>
+
+<script>
+const DB_NAME='glp1TrackerDB', STORE_NAME='entries';
+let db;
+const mealNames=['breakfast','lunch','dinner','snacks'];
+const mealTitles={breakfast:'Breakfast',lunch:'Lunch',dinner:'Dinner',snacks:'Snacks / Drinks'};
+
+function openDB(){
+  return new Promise((resolve,reject)=>{
+    const r=indexedDB.open(DB_NAME,1);
+    r.onupgradeneeded=e=>{const d=e.target.result;if(!d.objectStoreNames.contains(STORE_NAME))d.createObjectStore(STORE_NAME,{keyPath:'date'})};
+    r.onsuccess=e=>{db=e.target.result;resolve(db)};r.onerror=()=>reject(r.error);
+  });
+}
+function putEntry(entry){return new Promise((resolve,reject)=>{const t=db.transaction(STORE_NAME,'readwrite');t.objectStore(STORE_NAME).put(entry);t.oncomplete=resolve;t.onerror=()=>reject(t.error)})}
+function getEntry(date){return new Promise((resolve,reject)=>{const t=db.transaction(STORE_NAME,'readonly');const r=t.objectStore(STORE_NAME).get(date);r.onsuccess=()=>resolve(r.result||null);r.onerror=()=>reject(r.error)})}
+function getAll(){return new Promise((resolve,reject)=>{const t=db.transaction(STORE_NAME,'readonly');const r=t.objectStore(STORE_NAME).getAll();r.onsuccess=()=>resolve(r.result||[]);r.onerror=()=>reject(r.error)})}
+function delEntry(date){return new Promise((resolve,reject)=>{const t=db.transaction(STORE_NAME,'readwrite');t.objectStore(STORE_NAME).delete(date);t.oncomplete=resolve;t.onerror=()=>reject(t.error)})}
+
+function todayISO(){const d=new Date(),o=d.getTimezoneOffset();return new Date(d.getTime()-o*60000).toISOString().split('T')[0]}
+function prettyDate(v){if(!v)return '';const [y,m,d]=v.split('-');return new Date(y,m-1,d).toLocaleDateString(undefined,{month:'short',day:'numeric'})}
+function updateTopDate(){document.getElementById('topDate').textContent=prettyDate(document.getElementById('entryDate').value)}
+
+function buildMeals(){
+  const holder=document.getElementById('mealList');
+  holder.innerHTML=mealNames.map(meal=>`
+    <div class="meal-summary">
+      <div class="meal-summary-top">
+        <h3>${mealTitles[meal]}</h3>
+        <div class="actions" style="margin-top:0">
+          <button class="btn small success" onclick="markMeal('${meal}')">Quick Add</button>
+          <button class="btn small secondary" onclick="toggleMeal('${meal}')">Open</button>
+        </div>
+      </div>
+      <div class="muted" id="${meal}_summary">Nothing logged</div>
+      <div class="meal-editor" id="${meal}_editor">
+        <div class="grid two">
+          <div><label>What did you eat?</label><input id="${meal}_desc" type="text"></div>
+          <div><label>Portion</label><select id="${meal}_portion"><option value="">Select</option><option>Small</option><option>Medium</option><option>Large</option><option>Very large</option></select></div>
+          <div><label>Approximate amount</label><input id="${meal}_amount" type="text" placeholder="2 eggs, 1 cup, 5 oz"></div>
+          <div><label>Meal photo</label><input id="${meal}_photo" type="file" accept="image/*" capture="environment"></div>
+        </div>
+        <img id="${meal}_preview" class="preview">
+        <div class="ai-box">
+          <h4>ChatGPT Meal Analysis</h4>
+          <div class="actions">
+            <button class="btn small primary" onclick="copyMealPrompt('${meal}')">Copy Prompt</button>
+            <button class="btn small secondary" onclick="openChatGPT()">Open ChatGPT</button>
+          </div>
+          <div class="status" id="${meal}_status"></div>
+          <div class="grid two" style="margin-top:10px">
+            <div><label>Calories</label><input id="${meal}_calories" type="number"></div>
+            <div><label>Protein (g)</label><input id="${meal}_protein" type="number"></div>
+            <div><label>Carbs (g)</label><input id="${meal}_carbs" type="number"></div>
+            <div><label>Fat (g)</label><input id="${meal}_fat" type="number"></div>
+          </div>
+          <div style="margin-top:10px"><label>Paste ChatGPT analysis</label><textarea id="${meal}_airesult"></textarea></div>
+        </div>
+        <div style="margin-top:10px"><label>Meal notes</label><textarea id="${meal}_notes"></textarea></div>
+      </div>
+    </div>`).join('');
+  mealNames.forEach(bindPhoto);
+}
+
+window.toggleMeal=function(meal){
+  const el=document.getElementById(meal+'_editor');
+  const open=el.classList.toggle('open');
+  event.target.textContent=open?'Close':'Open';
+}
+function bindPhoto(meal){
+  const input=document.getElementById(meal+'_photo'), preview=document.getElementById(meal+'_preview');
+  input.addEventListener('change',async e=>{
+    const file=e.target.files?.[0];if(!file)return;
+    const data=await resizeImage(file);preview.src=data;preview.dataset.image=data;preview.style.display='block';
+  });
+}
+function resizeImage(file){
+  return new Promise((resolve,reject)=>{
+    const r=new FileReader();r.onload=e=>{const img=new Image();img.onload=()=>{const max=900,s=Math.min(1,max/img.width),c=document.createElement('canvas');c.width=img.width*s;c.height=img.height*s;c.getContext('2d').drawImage(img,0,0,c.width,c.height);resolve(c.toDataURL('image/jpeg',.78))};img.onerror=reject;img.src=e.target.result};r.onerror=reject;r.readAsDataURL(file);
+  });
+}
+
+function val(id){return document.getElementById(id).value}
+function checkedSymptoms(){return [...document.querySelectorAll('#symptomChips input:checked')].map(x=>x.value)}
+function collect(){
+  const e={
+    date:val('entryDate'), entryDate:val('entryDate'), dose:val('dose'), injectionTime:val('injectionTime'),
+    injectionSite:val('injectionSite'), weight:val('weight'), sleep:val('sleep'), water:val('water'),
+    hunger:val('hunger'), energy:val('energy'), generalNotes:val('generalNotes'),
+    symptomNotes:val('symptomNotes'), symptoms:checkedSymptoms(),
+    exerciseType:val('exerciseType'), exerciseMinutes:val('exerciseMinutes'), steps:val('steps'),
+    activityNotes:val('activityNotes'), meals:{}
+  };
+  mealNames.forEach(m=>e.meals[m]={
+    description:val(m+'_desc'),portion:val(m+'_portion'),amount:val(m+'_amount'),
+    calories:val(m+'_calories'),protein:val(m+'_protein'),carbs:val(m+'_carbs'),fat:val(m+'_fat'),
+    aiAnalysis:val(m+'_airesult'),notes:val(m+'_notes'),
+    photo:document.getElementById(m+'_preview').dataset.image||''
+  });
+  return e;
+}
+function setVal(id,v){document.getElementById(id).value=v||''}
+function populate(e){
+  ['entryDate','dose','injectionTime','injectionSite','weight','sleep','water','hunger','energy','generalNotes','symptomNotes','exerciseType','exerciseMinutes','steps','activityNotes'].forEach(id=>setVal(id,e[id]));
+  const s=new Set(e.symptoms||[]);document.querySelectorAll('#symptomChips input').forEach(x=>x.checked=s.has(x.value));
+  mealNames.forEach(m=>{
+    const d=e.meals?.[m]||{};
+    setVal(m+'_desc',d.description);setVal(m+'_portion',d.portion);setVal(m+'_amount',d.amount);
+    setVal(m+'_calories',d.calories);setVal(m+'_protein',d.protein);setVal(m+'_carbs',d.carbs);setVal(m+'_fat',d.fat);
+    setVal(m+'_airesult',d.aiAnalysis);setVal(m+'_notes',d.notes);
+    const p=document.getElementById(m+'_preview');p.dataset.image=d.photo||'';p.src=d.photo||'';p.style.display=d.photo?'block':'none';
+    updateMealSummary(m);
+  });
+  currentLoadedDate=e.date;
+  updateTopDate();
+  syncQuickChoices();
+  updateCompletion();
+}
+function clearForm(){
+  if(!confirm('Clear the current form?'))return;
+  document.querySelectorAll('input[type=text],input[type=number],input[type=time],textarea').forEach(x=>x.value='');
+  document.querySelectorAll('select').forEach(x=>x.value='');
+  document.querySelectorAll('input[type=checkbox]').forEach(x=>x.checked=false);
+  mealNames.forEach(m=>{const p=document.getElementById(m+'_preview');p.src='';p.dataset.image='';p.style.display='none';updateMealSummary(m)});
+  document.getElementById('entryDate').value=todayISO();updateTopDate();syncQuickChoices();updateCompletion();
+}
+function updateMealSummary(m){
+  const d=val(m+'_desc'), c=val(m+'_calories');
+  document.getElementById(m+'_summary').textContent=d?(d+(c?' · '+c+' cal':'')):'Nothing logged';
+}
+async function loadDate(date){const e=await getEntry(date);if(e)populate(e);else{clearFormNoConfirm();document.getElementById('entryDate').value=date;updateTopDate()}}
+function clearFormNoConfirm(){
+  document.querySelectorAll('input[type=text],input[type=number],input[type=time],textarea').forEach(x=>x.value='');
+  document.querySelectorAll('select').forEach(x=>x.value='');
+  document.querySelectorAll('input[type=checkbox]').forEach(x=>x.checked=false);
+  mealNames.forEach(m=>{const p=document.getElementById(m+'_preview');p.src='';p.dataset.image='';p.style.display='none';updateMealSummary(m)});
+  syncQuickChoices();updateCompletion();
+}
+
+window.changeCounter=function(id,delta){
+  const el=document.getElementById(id);
+  let n=parseInt(el.value||'0',10)+delta;
+  if(n<0)n=0;
+  el.value=n;
+  const display=document.getElementById(id+'Display');
+  if(display)display.textContent=n;
+  updateCompletion();
+  scheduleAutosave();
+}
+window.setActivity=function(type,minutes){
+  document.getElementById('exerciseType').value=type;
+  document.getElementById('exerciseMinutes').value=minutes;
+  updateCompletion();
+  scheduleAutosave();
+}
+window.markMeal=function(meal){
+  const current=document.getElementById(meal+'_desc').value.trim();
+  if(!current){
+    document.getElementById(meal+'_desc').value='Meal logged';
+  }
+  updateMealSummary(meal);
+  showSaved();
+  updateCompletion();
+  scheduleAutosave();
+}
+function bindQuickChoices(){
+  document.querySelectorAll('[data-choice]').forEach(group=>{
+    group.querySelectorAll('.quick-btn').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        group.querySelectorAll('.quick-btn').forEach(b=>b.classList.remove('selected'));
+        btn.classList.add('selected');
+        document.getElementById(group.dataset.choice).value=btn.dataset.value;
+        updateCompletion();
+        scheduleAutosave();
+      });
+    });
+  });
+}
+function syncQuickChoices(){
+  document.querySelectorAll('[data-choice]').forEach(group=>{
+    const value=document.getElementById(group.dataset.choice).value;
+    group.querySelectorAll('.quick-btn').forEach(btn=>btn.classList.toggle('selected',btn.dataset.value===value));
+  });
+  const water=document.getElementById('waterDisplay');
+  if(water)water.textContent=document.getElementById('water').value||'0';
+}
+function updateCompletion(){
+  let done=0,total=6;
+  if(document.getElementById('dose').value)done++;
+  if(parseInt(document.getElementById('water').value||'0',10)>0)done++;
+  if(document.getElementById('hunger').value)done++;
+  if(document.getElementById('energy').value)done++;
+  if(mealNames.some(m=>document.getElementById(m+'_desc').value.trim()))done++;
+  if(document.getElementById('exerciseMinutes').value || document.querySelectorAll('#symptomChips input:checked').length)done++;
+  const pct=Math.round(done/total*100);
+  const t=document.getElementById('completionText'),b=document.getElementById('completionBar');
+  if(t)t.textContent=pct+'% complete';
+  if(b)b.style.width=pct+'%';
+}
+document.addEventListener('input',e=>{updateCompletion();if(e.target.id!=='restoreFile')scheduleAutosave()});
+document.addEventListener('change',e=>{updateCompletion();if(e.target.id!=='restoreFile')scheduleAutosave()});
+
+
+let autosaveTimer=null;
+let lastUndo=null;
+let currentLoadedDate=null;
+
+function getSettings(){
+  try{return JSON.parse(localStorage.getItem('glp1Settings')||'{}')}catch(e){return {}}
+}
+function applySettings(){
+  const s=getSettings();
+  const unit=document.getElementById('waterUnitLabel');
+  if(unit) unit.textContent=s.waterOz ? `${s.waterOz} oz servings` : 'glasses';
+  const weightLabel=document.querySelector('label[for="weight"]');
+  if(weightLabel) weightLabel.textContent=`Weight${s.weightUnit?` (${s.weightUnit})`:''}`;
+  updateDoseDayBadge();
+}
+window.openSetup=function(){
+  const s=getSettings();
+  document.getElementById('setupWaterOz').value=s.waterOz||'8';
+  document.getElementById('setupWeightUnit').value=s.weightUnit||'lb';
+  document.getElementById('setupInjectionDay').value=(s.injectionDay ?? '');
+  document.getElementById('setupOverlay').classList.add('show');
+}
+window.saveSetup=function(){
+  const s={
+    waterOz:document.getElementById('setupWaterOz').value,
+    weightUnit:document.getElementById('setupWeightUnit').value,
+    injectionDay:document.getElementById('setupInjectionDay').value
+  };
+  localStorage.setItem('glp1Settings',JSON.stringify(s));
+  document.getElementById('setupOverlay').classList.remove('show');
+  applySettings();
+}
+function updateDoseDayBadge(){
+  const badge=document.getElementById('doseDayBadge');
+  if(!badge)return;
+  const s=getSettings();
+  if(s.injectionDay==='' || s.injectionDay===undefined){
+    badge.textContent='Injection timing not set';
+    return;
+  }
+  const today=new Date();
+  const inj=parseInt(s.injectionDay,10);
+  const days=(today.getDay()-inj+7)%7;
+  badge.textContent=days===0?'Injection Day':`Day ${days} after injection`;
+}
+function scheduleAutosave(){
+  clearTimeout(autosaveTimer);
+  const status=document.getElementById('autosaveStatus');
+  if(status)status.textContent='Saving…';
+  autosaveTimer=setTimeout(()=>autosaveNow(),700);
+}
+async function autosaveNow(){
+  const e=collect();
+  if(!e.date)return;
+  mealNames.forEach(m=>e.meals[m].photo='');
+  await putEntry(e);
+  currentLoadedDate=e.date;
+  const status=document.getElementById('autosaveStatus');
+  if(status)status.textContent='✓ Saved automatically';
+  updateCompletion();
+  updateStorageInfo();
+}
+window.quickWater=function(){
+  const el=document.getElementById('water');
+  const before=parseInt(el.value||'0',10);
+  changeCounter('water',1);
+  lastUndo={type:'water',value:before};
+  const s=getSettings();
+  showUndo(`Added ${s.waterOz||8} oz water`);
+  scheduleAutosave();
+}
+function showUndo(text){
+  document.getElementById('undoText').textContent=text;
+  const t=document.getElementById('undoToast');
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer=setTimeout(()=>t.classList.remove('show'),5000);
+}
+window.undoLastAction=function(){
+  if(!lastUndo)return;
+  if(lastUndo.type==='water'){
+    document.getElementById('water').value=lastUndo.value;
+    document.getElementById('waterDisplay').textContent=lastUndo.value;
+    scheduleAutosave();
+  }
+  lastUndo=null;
+  document.getElementById('undoToast').classList.remove('show');
+}
+function checkDateRollover(){
+  const today=todayISO();
+  const dateField=document.getElementById('entryDate');
+  if(currentLoadedDate && currentLoadedDate!==today && dateField.value===currentLoadedDate){
+    autosaveNow().then(()=>loadDate(today));
+  }
+}
+setInterval(checkDateRollover,60000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkDateRollover()});
+
+window.saveCurrentDay=async function(){
+  const e=collect();if(!e.date){alert('Choose a date first.');return}
+  mealNames.forEach(m=>{
+    e.meals[m].photo='';
+    const p=document.getElementById(m+'_preview');
+    p.src='';p.dataset.image='';p.style.display='none';
+    document.getElementById(m+'_photo').value='';
+  });
+  await putEntry(e);
+  currentLoadedDate=e.date;
+  mealNames.forEach(updateMealSummary);
+  showSaved();
+  renderHistory();
+  updateStorageInfo();
+  const status=document.getElementById('autosaveStatus');
+  if(status)status.textContent='✓ Saved automatically';
+}
+function showSaved(){const b=document.getElementById('saveBanner');b.classList.add('show');setTimeout(()=>b.classList.remove('show'),1200)}
+
+window.copyMealPrompt=async function(meal){
+  const prompt=`Analyze the attached ${meal==='snacks'?'snack or drink':meal} photo for my GLP-1 food tracker.
+
+Please provide:
+1. Each visible food or drink
+2. Estimated portion size in cups, ounces, pieces, or visual comparisons
+3. Estimated calorie range for each item
+4. Estimated total calories
+5. Estimated protein, carbohydrates, fat, and fiber
+6. Possible hidden calories from oil, butter, sauces, dressing, or preparation
+7. Confidence rating: low, medium, or high
+8. One short question that would most improve the estimate
+
+Known details:
+- Description: ${val(meal+'_desc')||'Not entered'}
+- Approximate amount: ${val(meal+'_amount')||'Not entered'}
+
+Use realistic ranges rather than pretending the photo gives an exact measurement. Finish with a compact summary I can paste into my tracker.`;
+  try{await navigator.clipboard.writeText(prompt)}catch(e){const t=document.createElement('textarea');t.value=prompt;document.body.appendChild(t);t.select();document.execCommand('copy');t.remove()}
+  document.getElementById(meal+'_status').textContent='Prompt copied. Attach this photo in ChatGPT.';
+}
+window.openChatGPT=function(){window.open('https://chatgpt.com/','_blank')}
+
+async function renderHistory(){
+  const items=(await getAll()).sort((a,b)=>b.date.localeCompare(a.date)),h=document.getElementById('historyList');
+  if(!items.length){h.className='empty';h.textContent='No saved days yet.';return}
+  h.className='';h.innerHTML=items.map(e=>`
+    <div class="history-item">
+      <div class="history-top">
+        <div><div class="history-date">${e.date}</div><div class="muted">Weight: ${e.weight||'-'} · Hunger: ${e.hunger||'-'} · Exercise: ${e.exerciseMinutes||'0'} min</div></div>
+        <div class="actions" style="margin-top:0"><button class="btn small secondary" onclick="loadHistory('${e.date}')">Load</button><button class="btn small danger" onclick="removeHistory('${e.date}')">Delete</button></div>
+      </div>
+    </div>`).join('');
+}
+window.loadHistory=async function(date){switchScreen('today');await loadDate(date)}
+window.removeHistory=async function(date){if(confirm('Delete '+date+'?')){await delEntry(date);renderHistory()}}
+
+function switchScreen(id){
+  document.querySelectorAll('.screen').forEach(x=>x.classList.toggle('active',x.id===id));
+  document.querySelectorAll('.nav-btn').forEach(x=>x.classList.toggle('active',x.dataset.screen===id));
+  document.getElementById('screenTitle').textContent={today:'Today',meals:'Meals',symptoms:'Symptoms',activity:'Activity',history:'History'}[id];
+  if(id==='history'){renderHistory();updateStorageInfo();}
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+document.querySelectorAll('.nav-btn').forEach(b=>b.addEventListener('click',()=>switchScreen(b.dataset.screen)));
+
+function download(name,content,type){const a=document.createElement('a'),u=URL.createObjectURL(new Blob([content],{type}));a.href=u;a.download=name;a.click();URL.revokeObjectURL(u)}
+window.exportJSON=async function(){download('glp1_tracker_backup.json',JSON.stringify(await getAll(),null,2),'application/json')}
+window.exportCSV=async function(){
+  const rows=await getAll(),header=['date','weight','dose','sleep','water','hunger','energy','symptoms','exerciseType','exerciseMinutes','steps','generalNotes'];
+  const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
+  download('glp1_tracker_export.csv',[header.join(','),...rows.map(e=>[e.date,e.weight,e.dose,e.sleep,e.water,e.hunger,e.energy,(e.symptoms||[]).join('; '),e.exerciseType,e.exerciseMinutes,e.steps,e.generalNotes].map(q).join(','))].join('\n'),'text/csv');
+}
+
+function estimateBytes(obj){
+  try{return new Blob([JSON.stringify(obj)]).size}catch(e){return 0}
+}
+function formatBytes(bytes){
+  if(bytes<1024)return bytes+' B';
+  if(bytes<1024*1024)return (bytes/1024).toFixed(1)+' KB';
+  return (bytes/(1024*1024)).toFixed(1)+' MB';
+}
+async function updateStorageInfo(){
+  const rows=await getAll();
+  document.getElementById('storageInfo').textContent =
+    `${rows.length} saved day${rows.length===1?'':'s'} · approximately ${formatBytes(estimateBytes(rows))}`;
+}
+window.restoreJSON=function(){
+  document.getElementById('restoreFile').click();
+}
+document.getElementById('restoreFile')?.addEventListener('change',async e=>{
+  const file=e.target.files?.[0];if(!file)return;
+  try{
+    const data=JSON.parse(await file.text());
+    if(!Array.isArray(data))throw new Error('Invalid backup');
+    for(const entry of data){
+      if(entry && entry.date) await putEntry(entry);
+    }
+    alert('Backup restored.');
+    renderHistory();updateStorageInfo();
+  }catch(err){
+    alert('That backup file could not be restored.');
+  }
+  e.target.value='';
+});
+window.archiveAndClear=async function(){
+  const keep=parseInt(document.getElementById('keepDays').value,10);
+  const rows=(await getAll()).sort((a,b)=>a.date.localeCompare(b.date));
+  if(!rows.length){alert('There is no saved data to archive.');return}
+  const cutoff=new Date();
+  cutoff.setDate(cutoff.getDate()-keep);
+  const cutoffISO=cutoff.toISOString().split('T')[0];
+  const older=rows.filter(r=>r.date<cutoffISO);
+  if(!older.length){alert(`There are no entries older than ${keep} days.`);return}
+  download(`glp1_archive_${todayISO()}.json`,JSON.stringify(older,null,2),'application/json');
+  const ok=confirm(`The archive download has started. Delete ${older.length} entries older than ${keep} days now? Make sure the file was saved first.`);
+  if(!ok)return;
+  for(const r of older) await delEntry(r.date);
+  alert('Older entries were removed.');
+  renderHistory();updateStorageInfo();
+}
+window.clearAllData=async function(){
+  const rows=await getAll();
+  if(!rows.length){alert('There is no saved data to delete.');return}
+  const ok=confirm('Delete ALL saved tracker data? This cannot be undone unless you have a backup.');
+  if(!ok)return;
+  for(const r of rows) await delEntry(r.date);
+  clearFormNoConfirm();
+  document.getElementById('entryDate').value=todayISO();
+  updateTopDate();
+  renderHistory();updateStorageInfo();
+}
+
+
+async function init(){
+  buildMeals();bindQuickChoices();await openDB();document.getElementById('entryDate').value=todayISO();updateTopDate();
+  document.getElementById('entryDate').addEventListener('change',e=>loadDate(e.target.value));
+  await loadDate(todayISO());
+  await updateStorageInfo();
+  syncQuickChoices();updateCompletion();
+  currentLoadedDate=document.getElementById('entryDate').value;
+  applySettings();
+  if(!localStorage.getItem('glp1Settings'))openSetup();
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+  }
+}
+init();
+</script>
+</body>
+</html>
