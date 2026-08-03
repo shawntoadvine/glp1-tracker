@@ -116,7 +116,7 @@
       <div class="quick-home">
         <button type="button" onclick="quickWater()"><span class="emoji">💧</span>Add Water</button>
         <button type="button" onclick="switchScreen('meals')"><span class="emoji">🍽️</span>Add Meal</button>
-        <button type="button" onclick="switchScreen('symptoms')"><span class="emoji">❤️</span>Log Symptom</button>
+        <button type="button" onclick="switchScreen('symptoms')"><span class="emoji">❤️</span>Open Check-In</button>
         <button type="button" onclick="switchScreen('activity')"><span class="emoji">🏃</span>Add Exercise</button>
         <button type="button" onclick="runHealthShortcut()"><span class="emoji">⌚</span>Import Apple Health</button>
       </div>
@@ -132,16 +132,19 @@
       <h2>Daily Overview</h2>
       <div class="grid two">
         <div><label for="entryDate">Date</label><input id="entryDate" type="date"></div>
-        <div><label for="dose">GLP-1 Dose</label><input id="dose" type="text" placeholder="Example: 0.25 mg"></div>
-        <div><label for="injectionTime">Injection Time</label><input id="injectionTime" type="time"></div>
-        <div>
+        <div id="nonDoseDayNote" class="tiny" style="display:none;margin:4px 0 10px;">
+Injection and dose fields are hidden because this is not your scheduled dose day.
+</div>
+<div class="dose-day-only"><label for="dose">GLP-1 Dose</label><input id="dose" type="text" placeholder="Example: 0.25 mg"></div>
+        <div class="dose-day-only"><label for="injectionTime">Injection Time</label><input id="injectionTime" type="time"></div>
+        <div class="dose-day-only">
           <label for="injectionSite">Injection Site</label>
           <select id="injectionSite">
             <option value="">Select site</option><option>Abdomen</option><option>Left thigh</option><option>Right thigh</option>
             <option>Left arm</option><option>Right arm</option><option>Other</option>
           </select>
         </div>
-        <div><label for="weight">Weight</label><input id="weight" type="number" step="0.1" placeholder="lbs"></div>
+        <div class="dose-day-only"><label for="weight">Weight</label><input id="weight" type="number" step="0.1" placeholder="lbs"></div>
         <div><label for="sleep">Sleep</label><input id="sleep" type="number" step="0.1" placeholder="hours"></div>
 <div>
   <label>Tracker Sleep Score</label>
@@ -165,35 +168,11 @@
   </div>
   <input id="water" type="hidden" value="0">
 </div>
-        <div>
-  <label>Hunger right now</label>
-  <div class="quick-grid" data-choice="hunger">
-    <button type="button" class="quick-btn" data-value="2">Not hungry</button>
-    <button type="button" class="quick-btn" data-value="5">A little hungry</button>
-    <button type="button" class="quick-btn" data-value="8">Hungry</button>
-    <button type="button" class="quick-btn" data-value="10">Very hungry</button>
-  </div>
-  <input id="hunger" type="hidden">
-</div>
-        <div>
-  <label>Energy</label>
-  <div class="quick-grid" data-choice="energy">
-    <button type="button" class="quick-btn" data-value="2">Very low</button>
-    <button type="button" class="quick-btn" data-value="5">Okay</button>
-    <button type="button" class="quick-btn" data-value="8">Good</button>
-    <button type="button" class="quick-btn" data-value="10">Excellent</button>
-  </div>
-  <input id="energy" type="hidden">
-</div>
       </div>
       <div class="actions">
         <button class="btn primary" onclick="saveCurrentDay()">Save Today</button>
         <button class="btn secondary" onclick="clearForm()">Clear</button>
       </div>
-    </div>
-    <div class="card">
-      <h2>General Notes</h2>
-      <textarea id="generalNotes" placeholder="Anything important about today"></textarea>
     </div>
   </section>
 
@@ -207,7 +186,35 @@
 
   <section id="symptoms" class="screen">
     <div class="card">
-      <h2>Health Changes</h2>
+      <h2>Daily Check-In</h2>
+      <div class="section-note" style="margin-bottom:12px;">
+        Track how you feel today, including hunger, energy, and any health changes.
+      </div>
+      <div class="grid">
+<div>
+  <label>Hunger right now</label>
+  <div class="quick-grid" data-choice="hunger">
+    <button type="button" class="quick-btn" data-value="2">Not hungry</button>
+    <button type="button" class="quick-btn" data-value="5">A little hungry</button>
+    <button type="button" class="quick-btn" data-value="8">Hungry</button>
+    <button type="button" class="quick-btn" data-value="10">Very hungry</button>
+  </div>
+  <input id="hunger" type="hidden">
+</div>
+<div>
+  <label>Energy</label>
+  <div class="quick-grid" data-choice="energy">
+    <button type="button" class="quick-btn" data-value="2">Very low</button>
+    <button type="button" class="quick-btn" data-value="5">Okay</button>
+    <button type="button" class="quick-btn" data-value="8">Good</button>
+    <button type="button" class="quick-btn" data-value="10">Excellent</button>
+  </div>
+  <input id="energy" type="hidden">
+</div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Symptoms & Health Changes</h2>
       <div class="chips" id="symptomChips">
         <label class="chip"><input type="checkbox" value="Nausea"> Nausea</label>
         <label class="chip"><input type="checkbox" value="Constipation"> Constipation</label>
@@ -222,7 +229,11 @@
         <label for="symptomNotes">Symptom Notes</label>
         <textarea id="symptomNotes" placeholder="Severity, timing, how long it lasted, and anything unusual"></textarea>
       </div>
-      <div class="actions"><button class="btn primary" onclick="saveCurrentDay()">Save Symptoms</button></div>
+      <div class="actions"><button class="btn primary" onclick="saveCurrentDay()">Save Check-In</button></div>
+    </div>
+    <div class="card">
+      <h2>General Notes</h2>
+      <textarea id="generalNotes" placeholder="Anything important about today"></textarea>
     </div>
   </section>
 
@@ -345,7 +356,7 @@
 <div class="bottom-nav">
   <button class="nav-btn active" data-screen="today"><span class="icon">🏠</span>Today</button>
   <button class="nav-btn" data-screen="meals"><span class="icon">🍽️</span>Meals</button>
-  <button class="nav-btn" data-screen="symptoms"><span class="icon">❤️</span>Symptoms</button>
+  <button class="nav-btn" data-screen="symptoms"><span class="icon">❤️</span>Check-In</button>
   <button class="nav-btn" data-screen="activity"><span class="icon">🏃</span>Activity</button>
   <button class="nav-btn" data-screen="history"><span class="icon">📅</span>History</button>
 </div>
@@ -355,8 +366,23 @@
 <script>
 const DB_NAME='glp1TrackerDB', STORE_NAME='entries';
 let db;
-const mealNames=['breakfast','lunch','dinner','snacks'];
-const mealTitles={breakfast:'Breakfast',lunch:'Lunch',dinner:'Dinner',snacks:'Snacks / Drinks'};
+const baseMealNames=['breakfast','lunch','dinner'];
+let snackMealNames=['snacks'];
+const mealTitles={breakfast:'Breakfast',lunch:'Lunch',dinner:'Dinner'};
+
+function currentMealNames(){
+  return [...baseMealNames,...snackMealNames];
+}
+function mealTitle(meal){
+  if(mealTitle(meal)) return mealTitle(meal);
+  const index=snackMealNames.indexOf(meal);
+  return `Snack / Drink ${index+1}`;
+}
+function nextSnackMealName(){
+  let n=2;
+  while(snackMealNames.includes(`snacks${n}`)) n++;
+  return `snacks${n}`;
+}
 
 function openDB(){
   return new Promise((resolve,reject)=>{
@@ -374,15 +400,17 @@ function todayISO(){const d=new Date(),o=d.getTimezoneOffset();return new Date(d
 function prettyDate(v){if(!v)return '';const [y,m,d]=v.split('-');return new Date(y,m-1,d).toLocaleDateString(undefined,{month:'short',day:'numeric'})}
 function updateTopDate(){document.getElementById('topDate').textContent=prettyDate(document.getElementById('entryDate').value)}
 
-function buildMeals(){
-  const holder=document.getElementById('mealList');
-  holder.innerHTML=mealNames.map(meal=>`
-    <div class="meal-summary">
+function mealCardHTML(meal){
+  const isSnack=meal.startsWith('snacks');
+  const canDelete=isSnack && meal!=='snacks';
+  return `
+    <div class="meal-summary" data-meal="${meal}">
       <div class="meal-summary-top">
-        <h3>${mealTitles[meal]}</h3>
+        <h3 id="${meal}_title">${mealTitle(meal)}</h3>
         <div class="actions" style="margin-top:0">
           <button class="btn small success" onclick="markMeal('${meal}')">Quick Add</button>
-          <button class="btn small secondary" onclick="toggleMeal('${meal}')">Open</button>
+          <button class="btn small secondary" onclick="toggleMeal('${meal}',this)">Open</button>
+          ${canDelete?`<button class="btn small danger" onclick="deleteSnackDrink('${meal}')">Delete</button>`:''}
         </div>
       </div>
       <div class="muted" id="${meal}_summary">Nothing logged</div>
@@ -392,10 +420,10 @@ function buildMeals(){
           <div><label>Portion</label><select id="${meal}_portion"><option value="">Select</option><option>Small</option><option>Medium</option><option>Large</option><option>Very large</option></select></div>
           <div><label>Approximate amount</label><input id="${meal}_amount" type="text" placeholder="2 eggs, 1 cup, 5 oz"></div>
           <div>
-  <label>Add Meal Photo</label>
-  <input id="${meal}_photo" type="file" accept="image/*">
-  <div class="tiny">Choose Take Photo, Photo Library, or Files when your iPhone asks.</div>
-</div>
+            <label>Add Meal Photo</label>
+            <input id="${meal}_photo" type="file" accept="image/*">
+            <div class="tiny">Choose Take Photo, Photo Library, or Files when your iPhone asks.</div>
+          </div>
         </div>
         <img id="${meal}_preview" class="preview">
         <div class="ai-box">
@@ -413,22 +441,56 @@ function buildMeals(){
             <div><label>Fat (g)</label><input id="${meal}_fat" type="number"></div>
           </div>
           <div style="margin-top:10px"><label>Paste ChatGPT analysis</label><textarea id="${meal}_airesult"></textarea>
-<button type="button" class="btn secondary" onclick="pullNutritionFromSummary('${meal}')">Pull Numbers from Summary</button>
-<div class="tiny">Uses the most-likely estimate when available; otherwise uses the midpoint of a range.</div></div>
+            <button type="button" class="btn secondary" onclick="pullNutritionFromSummary('${meal}')">Pull Numbers from Summary</button>
+            <div class="tiny">Uses the most-likely estimate when available; otherwise uses the midpoint of a range.</div>
+          </div>
         </div>
         <div style="margin-top:10px"><label>Meal notes</label><textarea id="${meal}_notes"></textarea></div>
         <div class="actions">
-          <button type="button" class="btn primary" onclick="saveAndCloseMeal('${meal}')">Save ${mealTitles[meal]}</button>
+          <button type="button" class="btn primary" onclick="saveAndCloseMeal('${meal}')">Save ${mealTitle(meal)}</button>
         </div>
       </div>
-    </div>`).join('');
-  mealNames.forEach(bindPhoto);
+    </div>`;
 }
 
-window.toggleMeal=function(meal){
+function buildMeals(){
+  const holder=document.getElementById('mealList');
+  holder.innerHTML=currentMealNames().map(meal=>mealCardHTML(meal)).join('')+`
+    <div class="actions" style="margin-top:12px">
+      <button type="button" class="btn secondary" onclick="addSnackDrink()">+ Add Another Snack/Drink</button>
+    </div>`;
+  currentMealNames().forEach(bindPhoto);
+}
+
+window.addSnackDrink=function(){
+  lastCollectedMeals=collect().meals;
+  const meal=nextSnackMealName();
+  snackMealNames.push(meal);
+  buildMeals();
+  populateMealFields(lastCollectedMeals||{});
+  const editor=document.getElementById(meal+'_editor');
+  if(editor)editor.classList.add('open');
+  updateCompletion();
+  scheduleAutosave();
+}
+
+window.deleteSnackDrink=function(meal){
+  if(meal==='snacks') return;
+  lastCollectedMeals=collect().meals;
+  if(!confirm('Delete this snack or drink entry?')) return;
+  delete lastCollectedMeals[meal];
+  snackMealNames=snackMealNames.filter(m=>m!==meal);
+  buildMeals();
+  populateMealFields(lastCollectedMeals||{});
+  updateCompletion();
+  scheduleAutosave();
+}
+
+
+window.toggleMeal=function(meal,button){
   const el=document.getElementById(meal+'_editor');
   const open=el.classList.toggle('open');
-  event.target.textContent=open?'Close':'Open';
+  if(button)button.textContent=open?'Close':'Open';
 }
 function bindPhoto(meal){
   const input=document.getElementById(meal+'_photo'), preview=document.getElementById(meal+'_preview');
@@ -445,6 +507,7 @@ function resizeImage(file){
 
 function val(id){return document.getElementById(id).value}
 function checkedSymptoms(){return [...document.querySelectorAll('#symptomChips input:checked')].map(x=>x.value)}
+let lastCollectedMeals={};
 function collect(){
   const e={
     date:val('entryDate'), entryDate:val('entryDate'), dose:val('dose'), injectionTime:val('injectionTime'),
@@ -454,38 +517,53 @@ function collect(){
     exerciseType:val('exerciseType'), exerciseMinutes:val('exerciseMinutes'), steps:val('steps'), activeCalories:val('activeCalories'), averageHeartRate:val('averageHeartRate'),
     activityNotes:val('activityNotes'), meals:{}
   };
-  mealNames.forEach(m=>e.meals[m]={
+  currentMealNames().forEach(m=>e.meals[m]={
     description:val(m+'_desc'),portion:val(m+'_portion'),amount:val(m+'_amount'),
     calories:val(m+'_calories'),protein:val(m+'_protein'),carbs:val(m+'_carbs'),fat:val(m+'_fat'),
     aiAnalysis:val(m+'_airesult'),notes:val(m+'_notes'),
     photo:document.getElementById(m+'_preview').dataset.image||''
   });
+  lastCollectedMeals=JSON.parse(JSON.stringify(e.meals));
   return e;
 }
 function setVal(id,v){document.getElementById(id).value=v||''}
-function populate(e){
-  ['entryDate','dose','injectionTime','injectionSite','weight','sleep','sleepAwakeMinutes','sleepBedtime','sleepScore','water','hunger','energy','generalNotes','symptomNotes','exerciseType','exerciseMinutes','steps','activeCalories','averageHeartRate','activityNotes'].forEach(id=>setVal(id,e[id]));
-  const s=new Set(e.symptoms||[]);document.querySelectorAll('#symptomChips input').forEach(x=>x.checked=s.has(x.value));
-  mealNames.forEach(m=>{
-    const d=e.meals?.[m]||{};
+function populateMealFields(meals){
+  currentMealNames().forEach(m=>{
+    const d=meals?.[m]||{};
     setVal(m+'_desc',d.description);setVal(m+'_portion',d.portion);setVal(m+'_amount',d.amount);
     setVal(m+'_calories',d.calories);setVal(m+'_protein',d.protein);setVal(m+'_carbs',d.carbs);setVal(m+'_fat',d.fat);
     setVal(m+'_airesult',d.aiAnalysis);setVal(m+'_notes',d.notes);
-    const p=document.getElementById(m+'_preview');p.dataset.image=d.photo||'';p.src=d.photo||'';p.style.display=d.photo?'block':'none';
+    const p=document.getElementById(m+'_preview');
+    if(p){p.dataset.image=d.photo||'';p.src=d.photo||'';p.style.display=d.photo?'block':'none';}
     updateMealSummary(m);
   });
+}
+function configureSnacksFromMeals(meals){
+  const extras=Object.keys(meals||{}).filter(k=>/^snacks\d+$/.test(k))
+    .sort((a,b)=>Number(a.replace('snacks',''))-Number(b.replace('snacks','')));
+  snackMealNames=['snacks',...extras];
+  buildMeals();
+}
+function populate(e){
+  ['entryDate','dose','injectionTime','injectionSite','weight','sleep','sleepAwakeMinutes','sleepBedtime','sleepScore','water','hunger','energy','generalNotes','symptomNotes','exerciseType','exerciseMinutes','steps','activeCalories','averageHeartRate','activityNotes'].forEach(id=>setVal(id,e[id]));
+  const s=new Set(e.symptoms||[]);document.querySelectorAll('#symptomChips input').forEach(x=>x.checked=s.has(x.value));
+  configureSnacksFromMeals(e.meals||{});
+  lastCollectedMeals=JSON.parse(JSON.stringify(e.meals||{}));
+  populateMealFields(e.meals||{});
   currentLoadedDate=e.date;
   updateTopDate();
   syncQuickChoices();
   updateSleepScore();
+  updateDoseDayFields();
   updateCompletion();
 }
 function clearForm(){
   if(!confirm('Clear the current form?'))return;
+  snackMealNames=['snacks'];buildMeals();lastCollectedMeals={};
   document.querySelectorAll('input[type=text],input[type=number],input[type=time],textarea').forEach(x=>x.value='');
   document.querySelectorAll('select').forEach(x=>x.value='');
   document.querySelectorAll('input[type=checkbox]').forEach(x=>x.checked=false);
-  mealNames.forEach(m=>{const p=document.getElementById(m+'_preview');p.src='';p.dataset.image='';p.style.display='none';updateMealSummary(m)});
+  currentMealNames().forEach(m=>{const p=document.getElementById(m+'_preview');p.src='';p.dataset.image='';p.style.display='none';updateMealSummary(m)});
   document.getElementById('entryDate').value=todayISO();updateTopDate();syncQuickChoices();updateCompletion();
 }
 
@@ -703,7 +781,7 @@ window.saveAndCloseMeal=async function(meal){
 window.saveAllMealsAndClose=async function(){
   await saveCurrentDay();
 
-  mealNames.forEach(meal=>{
+  currentMealNames().forEach(meal=>{
     const editor=document.getElementById(meal+'_editor');
     if(editor)editor.classList.remove('open');
     updateMealSummary(meal);
@@ -729,10 +807,11 @@ function updateMealSummary(m){
 }
 async function loadDate(date){const e=await getEntry(date);if(e)populate(e);else{clearFormNoConfirm();document.getElementById('entryDate').value=date;updateTopDate()}}
 function clearFormNoConfirm(){
+  snackMealNames=['snacks'];buildMeals();lastCollectedMeals={};
   document.querySelectorAll('input[type=text],input[type=number],input[type=time],textarea').forEach(x=>x.value='');
   document.querySelectorAll('select').forEach(x=>x.value='');
   document.querySelectorAll('input[type=checkbox]').forEach(x=>x.checked=false);
-  mealNames.forEach(m=>{const p=document.getElementById(m+'_preview');p.src='';p.dataset.image='';p.style.display='none';updateMealSummary(m)});
+  currentMealNames().forEach(m=>{const p=document.getElementById(m+'_preview');p.src='';p.dataset.image='';p.style.display='none';updateMealSummary(m)});
   syncQuickChoices();updateCompletion();
 }
 
@@ -784,15 +863,40 @@ function syncQuickChoices(){
   if(water)water.textContent=document.getElementById('water').value||'0';
 }
 function updateCompletion(){
-  let done=0,total=6;
-  if(document.getElementById('dose').value)done++;
-  if(parseInt(document.getElementById('water').value||'0',10)>0)done++;
-  if(document.getElementById('hunger').value)done++;
-  if(document.getElementById('energy').value)done++;
-  if(mealNames.some(m=>document.getElementById(m+'_desc').value.trim()))done++;
-  if(document.getElementById('exerciseMinutes').value || document.querySelectorAll('#symptomChips input:checked').length)done++;
-  const pct=Math.round(done/total*100);
-  const t=document.getElementById('completionText'),b=document.getElementById('completionBar');
+  let done=0;
+  let total=6;
+
+  const sleepValue=parseFloat(document.getElementById('sleep')?.value||'0');
+  if(sleepValue>0) done++;
+
+  if(parseInt(document.getElementById('water')?.value||'0',10)>0) done++;
+  if(document.getElementById('hunger')?.value) done++;
+  if(document.getElementById('energy')?.value) done++;
+
+  if(currentMealNames().some(m=>document.getElementById(m+'_desc')?.value.trim())) done++;
+
+  const hasActivity=parseFloat(document.getElementById('exerciseMinutes')?.value||'0')>0
+    || parseInt(document.getElementById('steps')?.value||'0',10)>0;
+  const hasSymptom=document.querySelectorAll('#symptomChips input:checked').length>0;
+  if(hasActivity || hasSymptom) done++;
+
+  const entryDate=document.getElementById('entryDate')?.value;
+  if(entryDate){
+    const selectedDate=new Date(`${entryDate}T12:00:00`);
+    const isDoseDay=selectedDate.getDay()===getConfiguredDoseDay();
+
+    if(isDoseDay){
+      total++;
+      const hasDose=document.getElementById('dose')?.value.trim();
+      const hasTime=document.getElementById('injectionTime')?.value;
+      const hasSite=document.getElementById('injectionSite')?.value;
+      if(hasDose && hasTime && hasSite) done++;
+    }
+  }
+
+  const pct=total ? Math.round(done/total*100) : 0;
+  const t=document.getElementById('completionText');
+  const b=document.getElementById('completionBar');
   if(t)t.textContent=pct+'% complete';
   if(b)b.style.width=pct+'%';
 }
@@ -854,7 +958,7 @@ function scheduleAutosave(){
 async function autosaveNow(){
   const e=collect();
   if(!e.date)return;
-  mealNames.forEach(m=>e.meals[m].photo='');
+  currentMealNames().forEach(m=>e.meals[m].photo='');
   await putEntry(e);
   currentLoadedDate=e.date;
   const status=document.getElementById('autosaveStatus');
@@ -900,7 +1004,7 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkDateR
 
 window.saveCurrentDay=async function(){
   const e=collect();if(!e.date){alert('Choose a date first.');return}
-  mealNames.forEach(m=>{
+  currentMealNames().forEach(m=>{
     e.meals[m].photo='';
     const p=document.getElementById(m+'_preview');
     p.src='';p.dataset.image='';p.style.display='none';
@@ -908,7 +1012,7 @@ window.saveCurrentDay=async function(){
   });
   await putEntry(e);
   currentLoadedDate=e.date;
-  mealNames.forEach(updateMealSummary);
+  currentMealNames().forEach(updateMealSummary);
   showSaved();
   renderHistory();
   updateStorageInfo();
@@ -918,7 +1022,7 @@ window.saveCurrentDay=async function(){
 function showSaved(){const b=document.getElementById('saveBanner');b.classList.add('show');setTimeout(()=>b.classList.remove('show'),1200)}
 
 function buildMealPrompt(meal){
-  return `Analyze the attached ${meal==='snacks'?'snack or drink':meal} photo for my GLP-1 food tracker.
+  return `Analyze the attached ${meal.startsWith('snacks')?'snack or drink':meal} photo for my GLP-1 food tracker.
 
 Please provide:
 1. Each visible food or drink
@@ -1012,7 +1116,7 @@ window.removeHistory=async function(date){if(confirm('Delete '+date+'?')){await 
 function switchScreen(id){
   document.querySelectorAll('.screen').forEach(x=>x.classList.toggle('active',x.id===id));
   document.querySelectorAll('.nav-btn').forEach(x=>x.classList.toggle('active',x.dataset.screen===id));
-  document.getElementById('screenTitle').textContent={today:'Today',meals:'Meals',symptoms:'Symptoms',activity:'Activity',history:'History'}[id];
+  document.getElementById('screenTitle').textContent={today:'Today',meals:'Meals',symptoms:'Check-In',activity:'Activity',history:'History'}[id];
   if(id==='history'){renderHistory();updateStorageInfo();}
   window.scrollTo({top:0,behavior:'smooth'});
 }
@@ -1214,10 +1318,28 @@ function importHealthFromURL(){
   }
   updateSleepScore();
 
-  if(p.get('exerciseType')){
-    document.getElementById('exerciseType').value=p.get('exerciseType');
-  }else if(p.get('exercise')){
-    document.getElementById('exerciseType').value='Apple Health';
+  const importedExercise=p.get('exercise');
+  const importedExerciseType=p.get('exerciseType');
+
+  if(importedExercise!==null && importedExercise!==''){
+    const minutesField=document.getElementById('exerciseMinutes');
+    if(minutesField){
+      const minutes=parseFloat(String(importedExercise).replace(/,/g,''));
+      if(!Number.isNaN(minutes)) minutesField.value=Math.round(minutes);
+    }
+  }
+
+  const activityField=document.getElementById('exerciseType');
+  if(activityField){
+    if(importedExerciseType){
+      activityField.value=importedExerciseType;
+    }else if(
+      parseFloat(importedExercise||'0')>0 ||
+      parseInt(p.get('steps')||'0',10)>0 ||
+      parseFloat(p.get('calories')||'0')>0
+    ){
+      activityField.value='Apple Health';
+    }
   }
 
   if(imported.length){
@@ -1229,6 +1351,9 @@ function importHealthFromURL(){
 
     syncQuickChoices();
     updateCompletion();
+    const activityStatus=document.getElementById('activityImportStatus');
+    if(activityStatus) activityStatus.textContent='✓ Activity and minutes imported';
+
     setTimeout(()=>autosaveNow(),300);
   }
 
@@ -1239,11 +1364,57 @@ function importHealthFromURL(){
 document.addEventListener('input',e=>{
   if(['sleep','sleepAwakeMinutes','sleepBedtime'].includes(e.target?.id)) updateSleepScore();
 });
+
+function normalizeDoseDay(value){
+  if(value===null||value===undefined||value==='') return 4;
+  const n=Number(value);
+  if(Number.isInteger(n)&&n>=0&&n<=6) return n;
+  const days={sunday:0,sun:0,monday:1,mon:1,tuesday:2,tue:2,tues:2,wednesday:3,wed:3,thursday:4,thu:4,thurs:4,friday:5,fri:5,saturday:6,sat:6};
+  return days[String(value).trim().toLowerCase()] ?? 4;
+}
+function getConfiguredDoseDay(){
+  const keys=['injectionDay','doseDay','glp1InjectionDay','settings_injectionDay'];
+  for(const key of keys){
+    const raw=localStorage.getItem(key);
+    if(raw!==null){
+      try{
+        const parsed=JSON.parse(raw);
+        if(parsed&&typeof parsed==='object'){
+          const nested=parsed.injectionDay ?? parsed.doseDay;
+          if(nested!==undefined) return normalizeDoseDay(nested);
+        }
+        return normalizeDoseDay(parsed);
+      }catch(e){ return normalizeDoseDay(raw); }
+    }
+  }
+  for(let i=0;i<localStorage.length;i++){
+    const raw=localStorage.getItem(localStorage.key(i));
+    if(!raw||raw[0]!=='{') continue;
+    try{
+      const data=JSON.parse(raw);
+      const nested=data.injectionDay ?? data.doseDay;
+      if(nested!==undefined) return normalizeDoseDay(nested);
+    }catch(e){}
+  }
+  return 4;
+}
+function updateDoseDayFields(){
+  const input=document.getElementById('entryDate');
+  if(!input||!input.value) return;
+  const selected=new Date(`${input.value}T12:00:00`);
+  const show=selected.getDay()===getConfiguredDoseDay();
+  document.querySelectorAll('.dose-day-only').forEach(el=>el.style.display=show?'':'none');
+  const note=document.getElementById('nonDoseDayNote');
+  if(note) note.style.display=show?'none':'block';
+}
+document.addEventListener('change',e=>{
+  if(e.target?.id==='entryDate'){ updateDoseDayFields(); updateCompletion(); }
+});
+
 async function init(){
   buildMeals();bindQuickChoices();await openDB();document.getElementById('entryDate').value=todayISO();updateTopDate();
   document.getElementById('entryDate').addEventListener('change',e=>loadDate(e.target.value));
   await loadDate(todayISO());
-  importHealthFromURL();
   await updateStorageInfo();
   syncQuickChoices();updateCompletion();
   currentLoadedDate=document.getElementById('entryDate').value;
@@ -1255,6 +1426,7 @@ async function init(){
   if('serviceWorker' in navigator){
     navigator.serviceWorker.register('service-worker.js').catch(()=>{});
   }
+  importHealthFromURL();
 }
 init();
 </script>
