@@ -402,7 +402,9 @@ function buildMeals(){
             <div><label>Carbs (g)</label><input id="${meal}_carbs" type="number"></div>
             <div><label>Fat (g)</label><input id="${meal}_fat" type="number"></div>
           </div>
-          <div style="margin-top:10px"><label>Paste ChatGPT analysis</label><textarea id="${meal}_airesult"></textarea></div>
+          <div style="margin-top:10px"><label>Paste ChatGPT analysis</label><textarea id="${meal}_airesult"></textarea>
+<button type="button" class="btn secondary" onclick="pullNutritionFromSummary('${meal}')">Pull Numbers from Summary</button>
+<div class="tiny">Uses the most-likely estimate when available; otherwise uses the midpoint of a range.</div></div>
         </div>
         <div style="margin-top:10px"><label>Meal notes</label><textarea id="${meal}_notes"></textarea></div>
         <div class="actions">
@@ -474,6 +476,53 @@ function clearForm(){
   document.querySelectorAll('input[type=checkbox]').forEach(x=>x.checked=false);
   mealNames.forEach(m=>{const p=document.getElementById(m+'_preview');p.src='';p.dataset.image='';p.style.display='none';updateMealSummary(m)});
   document.getElementById('entryDate').value=todayISO();updateTopDate();syncQuickChoices();updateCompletion();
+}
+
+
+function midpoint(a, b) { return Math.round((Number(a) + Number(b)) / 2); }
+function parseRangeOrSingle(text, label) {
+  const range = new RegExp(label + String.raw`\\s*[:\\-]?\\s*~?\\s*(\\d+(?:\\.\\d+)?)\\s*[–-]\\s*(\\d+(?:\\.\\d+)?)`, 'i');
+  const single = new RegExp(label + String.raw`\\s*[:\\-]?\\s*~?\\s*(\\d+(?:\\.\\d+)?)`, 'i');
+  let m = text.match(range);
+  if (m) return midpoint(m[1], m[2]);
+  m = text.match(single);
+  return m ? Math.round(Number(m[1])) : null;
+}
+function pullNutritionFromSummary(meal) {
+  const analysis = document.getElementById(`${meal}_airesult`);
+  const text = analysis ? analysis.value.trim() : '';
+  if (!text) { alert('Paste the Tracker Summary first.'); return; }
+  let calories = null;
+  let m = text.match(/most likely\\s*~?\\s*(\\d+(?:\\.\\d+)?)/i);
+  if (m) calories = Math.round(Number(m[1]));
+  if (calories === null) {
+    m = text.match(/(?:estimated\\s*)?(\\d+(?:\\.\\d+)?)\\s*[–-]\\s*(\\d+(?:\\.\\d+)?)\\s*(?:kcal|calories?)/i);
+    if (m) calories = midpoint(m[1], m[2]);
+  }
+  if (calories === null) {
+    m = text.match(/~?\\s*(\\d+(?:\\.\\d+)?)\\s*(?:kcal|calories?)/i);
+    if (m) calories = Math.round(Number(m[1]));
+  }
+  const values = {
+    calories,
+    protein: parseRangeOrSingle(text, 'Protein'),
+    carbs: parseRangeOrSingle(text, 'Carbs'),
+    fat: parseRangeOrSingle(text, 'Fat')
+  };
+  const ids = {calories:`${meal}_calories`, protein:`${meal}_protein`, carbs:`${meal}_carbs`, fat:`${meal}_fat`};
+  let filled=0;
+  Object.entries(values).forEach(([k,v])=>{
+    if (v !== null && !Number.isNaN(v)) {
+      const el=document.getElementById(ids[k]);
+      if (el) { el.value=v; el.dispatchEvent(new Event('input',{bubbles:true})); filled++; }
+    }
+  });
+  if (filled) {
+    if (typeof autosave === 'function') autosave();
+    alert('Nutrition numbers added from the summary.');
+  } else {
+    alert('No calories or macros were found in that summary.');
+  }
 }
 
 window.saveAndCloseMeal=async function(meal){
