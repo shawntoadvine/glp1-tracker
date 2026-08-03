@@ -180,6 +180,62 @@ Injection and dose fields are hidden because this is not your scheduled dose day
     <div class="section-note">
       Open one meal at a time. Take a new photo or choose one from your library, then share it with ChatGPT and paste the result back here. The photo is removed from the tracker after you save.
     </div>
+
+    <div class="card">
+      <h2>Quick Add Drinks</h2>
+
+      <div class="ai-box" style="margin-bottom:12px;">
+        <h4 style="margin-top:0;">Coffee</h4>
+        <div class="grid two">
+          <div>
+            <label>Cups of coffee</label>
+            <input id="quickCoffeeCups" type="number" min="0.5" step="0.5" value="1">
+          </div>
+          <div>
+            <label>Kroger French Vanilla creamer (Tbsp)</label>
+            <input id="quickCoffeeCreamer" type="number" min="0" step="0.5" value="2">
+          </div>
+        </div>
+        <div class="tiny">Creamer uses 35 calories, 5 g carbs, and 1.5 g fat per tablespoon.</div>
+        <div class="actions">
+          <button type="button" class="btn success" onclick="quickAddCoffee()">+ Add Coffee</button>
+        </div>
+      </div>
+
+      <div class="ai-box">
+        <h4 style="margin-top:0;">Beer</h4>
+        <div class="grid two">
+          <div>
+            <label>Beer type</label>
+            <select id="quickBeerType" onchange="updateBeerCaloriesPreset()">
+              <option value="light">Light beer</option>
+              <option value="regular" selected>Regular beer</option>
+              <option value="craft">Craft / higher-ABV beer</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          <div>
+            <label>Ounces per beer</label>
+            <input id="quickBeerOunces" type="number" min="1" step="1" value="12">
+          </div>
+          <div>
+            <label>Number of beers</label>
+            <input id="quickBeerQuantity" type="number" min="1" step="1" value="1">
+          </div>
+          <div>
+            <label>Calories per 12 oz</label>
+            <input id="quickBeerCalories12" type="number" min="0" step="1" value="153">
+          </div>
+        </div>
+        <div class="tiny">Ounces, quantity, and calorie estimate are editable before adding.</div>
+        <div class="actions">
+          <button type="button" class="btn success" onclick="quickAddBeer()">+ Add Beer</button>
+        </div>
+      </div>
+
+      <div id="quickDrinkStatus" class="status"></div>
+    </div>
+
     <div class="meal-list" id="mealList"></div>
     <div class="actions"><button class="btn primary" onclick="saveAllMealsAndClose()">Save All Meals</button></div>
   </section>
@@ -451,6 +507,128 @@ function mealCardHTML(meal){
         </div>
       </div>
     </div>`;
+}
+
+
+function findAvailableSnackMeal(){
+  for(const meal of snackMealNames){
+    const desc=document.getElementById(meal+'_desc')?.value.trim();
+    if(!desc) return meal;
+  }
+
+  lastCollectedMeals=collect().meals;
+  const meal=nextSnackMealName();
+  snackMealNames.push(meal);
+  buildMeals();
+  populateMealFields(lastCollectedMeals||{});
+  return meal;
+}
+
+function fillQuickDrinkMeal(meal,data){
+  const fields={
+    desc:data.description||'',
+    portion:data.portion||'Small',
+    amount:data.amount||'',
+    calories:data.calories??'',
+    protein:data.protein??0,
+    carbs:data.carbs??0,
+    fat:data.fat??0,
+    airesult:data.analysis||'',
+    notes:data.notes||''
+  };
+
+  Object.entries(fields).forEach(([suffix,value])=>{
+    const el=document.getElementById(`${meal}_${suffix}`);
+    if(el){
+      el.value=value;
+      el.dispatchEvent(new Event('input',{bubbles:true}));
+      el.dispatchEvent(new Event('change',{bubbles:true}));
+    }
+  });
+
+  updateMealSummary(meal);
+  const editor=document.getElementById(meal+'_editor');
+  if(editor) editor.classList.remove('open');
+
+  scheduleAutosave();
+  updateCompletion();
+
+  const status=document.getElementById('quickDrinkStatus');
+  if(status){
+    status.textContent=`✓ ${data.description} added`;
+    setTimeout(()=>{status.textContent='';},2200);
+  }
+}
+
+window.quickAddCoffee=function(){
+  const cups=Math.max(0,parseFloat(document.getElementById('quickCoffeeCups')?.value||'1'));
+  const creamer=Math.max(0,parseFloat(document.getElementById('quickCoffeeCreamer')?.value||'0'));
+
+  if(cups<=0){
+    alert('Enter the number of cups of coffee.');
+    return;
+  }
+
+  const calories=Math.round((cups*2)+(creamer*35));
+  const carbs=Math.round(creamer*5*10)/10;
+  const fat=Math.round(creamer*1.5*10)/10;
+  const meal=findAvailableSnackMeal();
+
+  fillQuickDrinkMeal(meal,{
+    description:'Coffee with Kroger French Vanilla creamer',
+    portion:cups<=1?'Small':cups<=2?'Medium':'Large',
+    amount:`${cups} cup${cups===1?'':'s'} coffee; ${creamer} Tbsp creamer`,
+    calories,
+    protein:0,
+    carbs,
+    fat,
+    analysis:`Quick add estimate: ${cups} cup${cups===1?'':'s'} coffee with ${creamer} Tbsp Kroger Non-Dairy French Vanilla Coffee Creamer. Estimated ${calories} calories, ${carbs} g carbs, ${fat} g fat.`,
+    notes:'Creamer calculated at 35 calories per tablespoon.'
+  });
+}
+
+window.updateBeerCaloriesPreset=function(){
+  const type=document.getElementById('quickBeerType')?.value;
+  const calories={light:103,regular:153,craft:204};
+  if(calories[type]!==undefined){
+    document.getElementById('quickBeerCalories12').value=calories[type];
+  }
+}
+
+window.quickAddBeer=function(){
+  const type=document.getElementById('quickBeerType')?.value||'regular';
+  const ounces=Math.max(0,parseFloat(document.getElementById('quickBeerOunces')?.value||'12'));
+  const quantity=Math.max(1,parseInt(document.getElementById('quickBeerQuantity')?.value||'1',10));
+  const calories12=Math.max(0,parseFloat(document.getElementById('quickBeerCalories12')?.value||'153'));
+
+  if(ounces<=0){
+    alert('Enter the ounces per beer.');
+    return;
+  }
+
+  const labels={
+    light:'Light beer',
+    regular:'Regular beer',
+    craft:'Craft / higher-ABV beer',
+    custom:'Beer'
+  };
+  const carbPer12={light:6,regular:13,craft:18,custom:13};
+  const calories=Math.round((ounces/12)*calories12*quantity);
+  const carbs=Math.round((ounces/12)*(carbPer12[type]||13)*quantity*10)/10;
+  const totalOunces=ounces*quantity;
+  const meal=findAvailableSnackMeal();
+
+  fillQuickDrinkMeal(meal,{
+    description:labels[type],
+    portion:totalOunces<=12?'Small':totalOunces<=24?'Medium':'Large',
+    amount:`${quantity} × ${ounces} oz (${totalOunces} oz total)`,
+    calories,
+    protein:0,
+    carbs,
+    fat:0,
+    analysis:`Quick add estimate: ${quantity} ${labels[type].toLowerCase()}${quantity===1?'':'s'}, ${ounces} oz each. Estimated ${calories} calories and ${carbs} g carbs. Calories were calculated using ${calories12} calories per 12 oz.`,
+    notes:'Beer calories vary by brand and ABV; ounces and calories per 12 oz were editable.'
+  });
 }
 
 function buildMeals(){
