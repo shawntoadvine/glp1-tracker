@@ -480,6 +480,7 @@ function clearForm(){
 
 
 
+
 function midpoint(a, b) {
   return Math.round((Number(a) + Number(b)) / 2);
 }
@@ -501,6 +502,66 @@ function parseNumberRange(text, labelPattern) {
   if (match) return Math.round(Number(match[1]));
 
   return null;
+}
+
+function cleanMealDescription(text) {
+  let description = text
+    .replace(/^tracker summary\s*/i, '')
+    .replace(/^(breakfast|lunch|dinner|snacks?\s*\/?\s*drinks?)\s*:\s*/i, '')
+    .trim();
+
+  const stopPatterns = [
+    /\bestimated\b/i,
+    /\bcalories?\b/i,
+    /\bkcal\b/i,
+    /\bprotein\b/i
+  ];
+
+  let cut = description.length;
+  stopPatterns.forEach(pattern => {
+    const match = description.search(pattern);
+    if (match >= 0 && match < cut) cut = match;
+  });
+
+  description = description.slice(0, cut)
+    .replace(/[.;,\s]+$/, '')
+    .trim();
+
+  return description;
+}
+
+function extractApproximateAmounts(description) {
+  const amountPattern = /(?:~?\s*\d+(?:\.\d+)?(?:\s*[–—-]\s*\d+(?:\.\d+)?)?\s*(?:oz|ounces?|cups?|tbsp|tablespoons?|tsp|teaspoons?|pieces?|slices?|medium|small|large|¼|⅓|½|¾))|(?:[¼⅓½¾]\s*(?:cup|cups|tbsp|tablespoons?|tsp|teaspoons?))/gi;
+  const matches = description.match(amountPattern) || [];
+  return [...new Set(matches.map(v => v.replace(/\s+/g, ' ').trim()))].join('; ');
+}
+
+function extractPortionSummary(description) {
+  const parts = description.split(/,\s+(?=[a-z])/i)
+    .map(part => part.trim())
+    .filter(Boolean);
+
+  const withAmounts = parts.filter(part =>
+    /(?:\d|¼|⅓|½|¾|small|medium|large|cup|oz|tbsp|tsp|piece|slice)/i.test(part)
+  );
+
+  return withAmounts.slice(0, 4).join('; ');
+}
+
+function setFirstAvailableField(meal, suffixes, value) {
+  if (!value) return false;
+
+  for (const suffix of suffixes) {
+    const el = document.getElementById(`${meal}_${suffix}`);
+    if (el) {
+      el.value = value;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function pullNutritionFromSummary(meal) {
@@ -540,7 +601,7 @@ function pullNutritionFromSummary(meal) {
     if (match) calories = Math.round(Number(match[1]));
   }
 
-  const values = {
+  const nutritionValues = {
     calories,
     protein: parseNumberRange(text, String.raw`\bprotein\b`),
     carbs: parseNumberRange(text, String.raw`\b(?:carbs?|carbohydrates?)\b`),
@@ -555,7 +616,8 @@ function pullNutritionFromSummary(meal) {
   };
 
   let filled = 0;
-  Object.entries(values).forEach(([key, value]) => {
+
+  Object.entries(nutritionValues).forEach(([key, value]) => {
     const el = document.getElementById(ids[key]);
     if (el && value !== null && !Number.isNaN(value)) {
       el.value = value;
@@ -565,11 +627,19 @@ function pullNutritionFromSummary(meal) {
     }
   });
 
+  const description = cleanMealDescription(text);
+  const portion = extractPortionSummary(description);
+  const approximateAmount = extractApproximateAmounts(description);
+
+  if (setFirstAvailableField(meal, ['desc', 'what', 'food', 'description', 'ate'], description)) filled++;
+  if (setFirstAvailableField(meal, ['portion'], portion || approximateAmount)) filled++;
+  if (setFirstAvailableField(meal, ['amount', 'approx', 'approximate'], approximateAmount || portion)) filled++;
+
   if (filled) {
     if (typeof autosave === 'function') autosave();
-    alert('Nutrition numbers added from the summary.');
+    alert('Meal details and nutrition were added from the summary.');
   } else {
-    alert('No calories or macros were found in that summary.');
+    alert('No meal details or nutrition were found in that summary.');
   }
 }
 
