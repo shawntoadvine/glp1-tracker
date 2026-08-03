@@ -374,9 +374,9 @@ function currentMealNames(){
   return [...baseMealNames,...snackMealNames];
 }
 function mealTitle(meal){
-  if(mealTitle(meal)) return mealTitle(meal);
+  if(mealTitles[meal]) return mealTitles[meal];
   const index=snackMealNames.indexOf(meal);
-  return `Snack / Drink ${index+1}`;
+  return `Snack / Drink ${Math.max(index+1,1)}`;
 }
 function nextSnackMealName(){
   let n=2;
@@ -455,11 +455,28 @@ function mealCardHTML(meal){
 
 function buildMeals(){
   const holder=document.getElementById('mealList');
-  holder.innerHTML=currentMealNames().map(meal=>mealCardHTML(meal)).join('')+`
-    <div class="actions" style="margin-top:12px">
-      <button type="button" class="btn secondary" onclick="addSnackDrink()">+ Add Another Snack/Drink</button>
-    </div>`;
-  currentMealNames().forEach(bindPhoto);
+  if(!holder) return;
+
+  try{
+    holder.innerHTML=currentMealNames().map(meal=>mealCardHTML(meal)).join('')+`
+      <div class="actions" style="margin-top:12px">
+        <button type="button" class="btn secondary" onclick="addSnackDrink()">+ Add Another Snack/Drink</button>
+      </div>`;
+    currentMealNames().forEach(bindPhoto);
+  }catch(error){
+    console.error('Meal rendering failed',error);
+    snackMealNames=['snacks'];
+    holder.innerHTML=[
+      mealCardHTML('breakfast'),
+      mealCardHTML('lunch'),
+      mealCardHTML('dinner'),
+      mealCardHTML('snacks'),
+      `<div class="actions" style="margin-top:12px">
+        <button type="button" class="btn secondary" onclick="addSnackDrink()">+ Add Another Snack/Drink</button>
+      </div>`
+    ].join('');
+    currentMealNames().forEach(bindPhoto);
+  }
 }
 
 window.addSnackDrink=function(){
@@ -539,9 +556,10 @@ function populateMealFields(meals){
   });
 }
 function configureSnacksFromMeals(meals){
-  const extras=Object.keys(meals||{}).filter(k=>/^snacks\d+$/.test(k))
+  const extras=Object.keys(meals||{})
+    .filter(k=>/^snacks\d+$/.test(k))
     .sort((a,b)=>Number(a.replace('snacks',''))-Number(b.replace('snacks','')));
-  snackMealNames=['snacks',...extras];
+  snackMealNames=['snacks',...new Set(extras)];
   buildMeals();
 }
 function populate(e){
