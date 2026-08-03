@@ -524,6 +524,69 @@ function findAvailableSnackMeal(){
   return meal;
 }
 
+
+function normalizedDrinkKey(data){
+  return [
+    String(data.description||'').trim().toLowerCase(),
+    String(data.unitAmount||data.amount||'').trim().toLowerCase(),
+    Number(data.unitCalories||data.calories||0).toFixed(2),
+    Number(data.unitCarbs||data.carbs||0).toFixed(2),
+    Number(data.unitFat||data.fat||0).toFixed(2)
+  ].join('|');
+}
+
+function findMatchingDrinkMeal(data){
+  const wantedKey=normalizedDrinkKey(data);
+
+  for(const meal of snackMealNames){
+    const key=document.getElementById(`${meal}_notes`)?.dataset.quickDrinkKey;
+    if(key && key===wantedKey) return meal;
+  }
+
+  return null;
+}
+
+function mergeQuickDrinkMeal(meal,data){
+  const caloriesEl=document.getElementById(`${meal}_calories`);
+  const carbsEl=document.getElementById(`${meal}_carbs`);
+  const fatEl=document.getElementById(`${meal}_fat`);
+  const amountEl=document.getElementById(`${meal}_amount`);
+  const notesEl=document.getElementById(`${meal}_notes`);
+  const analysisEl=document.getElementById(`${meal}_airesult`);
+
+  const currentCount=Math.max(1,Number(notesEl?.dataset.quickDrinkCount||1));
+  const addCount=Math.max(1,Number(data.quantity||1));
+  const newCount=currentCount+addCount;
+
+  if(caloriesEl) caloriesEl.value=Math.round((Number(caloriesEl.value)||0)+(Number(data.calories)||0));
+  if(carbsEl) carbsEl.value=Math.round(((Number(carbsEl.value)||0)+(Number(data.carbs)||0))*10)/10;
+  if(fatEl) fatEl.value=Math.round(((Number(fatEl.value)||0)+(Number(data.fat)||0))*10)/10;
+
+  if(amountEl){
+    amountEl.value=`${newCount} servings • ${data.unitAmount||data.amount||''}`;
+  }
+
+  if(notesEl){
+    notesEl.dataset.quickDrinkCount=String(newCount);
+    notesEl.dataset.quickDrinkKey=normalizedDrinkKey(data);
+    notesEl.value=`Quick Add drink combined automatically: ${newCount} identical servings.`;
+  }
+
+  if(analysisEl){
+    analysisEl.value=`Combined quick add: ${newCount} identical servings of ${data.description}. Total estimated ${caloriesEl?.value||0} calories, ${carbsEl?.value||0} g carbs, ${fatEl?.value||0} g fat.`;
+  }
+
+  updateMealSummary(meal);
+  scheduleAutosave();
+  updateCompletion();
+
+  const status=document.getElementById('quickDrinkStatus');
+  if(status){
+    status.textContent=`✓ Added to existing ${data.description} (${newCount} servings)`;
+    setTimeout(()=>{status.textContent='';},2200);
+  }
+}
+
 function fillQuickDrinkMeal(meal,data){
   const fields={
     desc:data.description||'',
@@ -545,6 +608,12 @@ function fillQuickDrinkMeal(meal,data){
       el.dispatchEvent(new Event('change',{bubbles:true}));
     }
   });
+
+  const notesEl=document.getElementById(`${meal}_notes`);
+  if(notesEl){
+    notesEl.dataset.quickDrinkKey=normalizedDrinkKey(data);
+    notesEl.dataset.quickDrinkCount=String(Math.max(1,Number(data.quantity||1)));
+  }
 
   updateMealSummary(meal);
   const editor=document.getElementById(meal+'_editor');
@@ -572,19 +641,29 @@ window.quickAddCoffee=function(){
   const calories=Math.round((cups*2)+(creamer*35));
   const carbs=Math.round(creamer*5*10)/10;
   const fat=Math.round(creamer*1.5*10)/10;
-  const meal=findAvailableSnackMeal();
-
-  fillQuickDrinkMeal(meal,{
+  const data={
     description:'Coffee with Kroger French Vanilla creamer',
     portion:cups<=1?'Small':cups<=2?'Medium':'Large',
     amount:`${cups} cup${cups===1?'':'s'} coffee; ${creamer} Tbsp creamer`,
+    unitAmount:`${cups} cup${cups===1?'':'s'} coffee; ${creamer} Tbsp creamer`,
     calories,
+    unitCalories:calories,
     protein:0,
     carbs,
+    unitCarbs:carbs,
     fat,
+    unitFat:fat,
+    quantity:1,
     analysis:`Quick add estimate: ${cups} cup${cups===1?'':'s'} coffee with ${creamer} Tbsp Kroger Non-Dairy French Vanilla Coffee Creamer. Estimated ${calories} calories, ${carbs} g carbs, ${fat} g fat.`,
     notes:'Creamer calculated at 35 calories per tablespoon.'
-  });
+  };
+
+  const existing=findMatchingDrinkMeal(data);
+  if(existing){
+    mergeQuickDrinkMeal(existing,data);
+  }else{
+    fillQuickDrinkMeal(findAvailableSnackMeal(),data);
+  }
 }
 
 window.updateBeerCaloriesPreset=function(){
@@ -616,19 +695,29 @@ window.quickAddBeer=function(){
   const calories=Math.round((ounces/12)*calories12*quantity);
   const carbs=Math.round((ounces/12)*(carbPer12[type]||13)*quantity*10)/10;
   const totalOunces=ounces*quantity;
-  const meal=findAvailableSnackMeal();
-
-  fillQuickDrinkMeal(meal,{
+  const data={
     description:labels[type],
     portion:totalOunces<=12?'Small':totalOunces<=24?'Medium':'Large',
     amount:`${quantity} × ${ounces} oz (${totalOunces} oz total)`,
+    unitAmount:`${ounces} oz each`,
     calories,
+    unitCalories:Math.round((ounces/12)*calories12),
     protein:0,
     carbs,
+    unitCarbs:Math.round((ounces/12)*(carbPer12[type]||13)*10)/10,
     fat:0,
+    unitFat:0,
+    quantity,
     analysis:`Quick add estimate: ${quantity} ${labels[type].toLowerCase()}${quantity===1?'':'s'}, ${ounces} oz each. Estimated ${calories} calories and ${carbs} g carbs. Calories were calculated using ${calories12} calories per 12 oz.`,
     notes:'Beer calories vary by brand and ABV; ounces and calories per 12 oz were editable.'
-  });
+  };
+
+  const existing=findMatchingDrinkMeal(data);
+  if(existing){
+    mergeQuickDrinkMeal(existing,data);
+  }else{
+    fillQuickDrinkMeal(findAvailableSnackMeal(),data);
+  }
 }
 
 function buildMeals(){
@@ -728,6 +817,11 @@ function populateMealFields(meals){
     setVal(m+'_desc',d.description);setVal(m+'_portion',d.portion);setVal(m+'_amount',d.amount);
     setVal(m+'_calories',d.calories);setVal(m+'_protein',d.protein);setVal(m+'_carbs',d.carbs);setVal(m+'_fat',d.fat);
     setVal(m+'_airesult',d.aiAnalysis);setVal(m+'_notes',d.notes);
+    const notesEl=document.getElementById(m+'_notes');
+    if(notesEl && d.notes?.startsWith('Quick Add drink combined automatically:')){
+      const countMatch=d.notes.match(/(\d+) identical servings/);
+      notesEl.dataset.quickDrinkCount=countMatch?countMatch[1]:'1';
+    }
     const p=document.getElementById(m+'_preview');
     if(p){p.dataset.image=d.photo||'';p.src=d.photo||'';p.style.display=d.photo?'block':'none';}
     updateMealSummary(m);
