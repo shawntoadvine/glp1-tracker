@@ -628,12 +628,27 @@ function pullNutritionFromSummary(meal) {
   });
 
   const description = cleanMealDescription(text);
-  const portion = extractPortionSummary(description);
+  const detailedPortion = extractPortionSummary(description);
   const approximateAmount = extractApproximateAmounts(description);
 
+  // The Portion field is a dropdown, so choose one of its valid values.
+  let portionSize = '';
+  const explicitPortion = text.match(/\b(very large|small|medium|large)\s+(?:portion|meal)\b/i);
+
+  if (explicitPortion) {
+    portionSize = explicitPortion[1]
+      .toLowerCase()
+      .replace(/^./, ch => ch.toUpperCase());
+  } else if (calories !== null) {
+    if (calories < 350) portionSize = 'Small';
+    else if (calories <= 700) portionSize = 'Medium';
+    else if (calories <= 1000) portionSize = 'Large';
+    else portionSize = 'Very large';
+  }
+
   if (setFirstAvailableField(meal, ['desc', 'what', 'food', 'description', 'ate'], description)) filled++;
-  if (setFirstAvailableField(meal, ['portion'], portion || approximateAmount)) filled++;
-  if (setFirstAvailableField(meal, ['amount', 'approx', 'approximate'], approximateAmount || portion)) filled++;
+  if (setFirstAvailableField(meal, ['portion'], portionSize)) filled++;
+  if (setFirstAvailableField(meal, ['amount', 'approx', 'approximate'], approximateAmount || detailedPortion)) filled++;
 
   if (filled) {
     if (typeof autosave === 'function') autosave();
