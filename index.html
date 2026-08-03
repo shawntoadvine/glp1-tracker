@@ -192,7 +192,7 @@ Injection and dose fields are hidden because this is not your scheduled dose day
       </div>
       <div class="grid">
 <div>
-  <label>Hunger right now</label>
+  <label>Hunger today</label>
   <div class="quick-grid" data-choice="hunger">
     <button type="button" class="quick-btn" data-value="2">Not hungry</button>
     <button type="button" class="quick-btn" data-value="5">A little hungry</button>
@@ -582,7 +582,7 @@ function clearForm(){
   document.querySelectorAll('select').forEach(x=>x.value='');
   document.querySelectorAll('input[type=checkbox]').forEach(x=>x.checked=false);
   currentMealNames().forEach(m=>{const p=document.getElementById(m+'_preview');p.src='';p.dataset.image='';p.style.display='none';updateMealSummary(m)});
-  document.getElementById('entryDate').value=todayISO();updateTopDate();syncQuickChoices();updateCompletion();
+  document.getElementById('entryDate').value=todayISO();updateTopDate();syncQuickChoices();updateDoseDayFields();updateCompletion();
 }
 
 
@@ -592,21 +592,35 @@ function midpoint(a, b) {
   return Math.round((Number(a) + Number(b)) / 2);
 }
 
-function parseNumberRange(text, labelPattern) {
-  const range = new RegExp(
+function parseNumberRange(text,labelPattern){
+  const afterRange=new RegExp(
     labelPattern + String.raw`\s*[:\-]?\s*~?\s*(\d+(?:\.\d+)?)\s*[–—-]\s*(\d+(?:\.\d+)?)`,
     'i'
   );
-  const single = new RegExp(
+  const afterSingle=new RegExp(
     labelPattern + String.raw`\s*[:\-]?\s*~?\s*(\d+(?:\.\d+)?)`,
     'i'
   );
+  const beforeRange=new RegExp(
+    String.raw`~?\s*(\d+(?:\.\d+)?)\s*[–—-]\s*(\d+(?:\.\d+)?)\s*(?:g|grams?)?\s*` + labelPattern,
+    'i'
+  );
+  const beforeSingle=new RegExp(
+    String.raw`~?\s*(\d+(?:\.\d+)?)\s*(?:g|grams?)?\s*` + labelPattern,
+    'i'
+  );
 
-  let match = text.match(range);
-  if (match) return midpoint(match[1], match[2]);
+  let match=text.match(afterRange);
+  if(match)return midpoint(match[1],match[2]);
 
-  match = text.match(single);
-  if (match) return Math.round(Number(match[1]));
+  match=text.match(beforeRange);
+  if(match)return midpoint(match[1],match[2]);
+
+  match=text.match(afterSingle);
+  if(match)return Math.round(Number(match[1]));
+
+  match=text.match(beforeSingle);
+  if(match)return Math.round(Number(match[1]));
 
   return null;
 }
@@ -823,14 +837,27 @@ function updateMealSummary(m){
     el.textContent='Nothing logged';
   }
 }
-async function loadDate(date){const e=await getEntry(date);if(e)populate(e);else{clearFormNoConfirm();document.getElementById('entryDate').value=date;updateTopDate()}}
+async function loadDate(date){
+  const e=await getEntry(date);
+  if(e){
+    populate(e);
+  }else{
+    clearFormNoConfirm();
+    document.getElementById('entryDate').value=date;
+    updateTopDate();
+    updateDoseDayFields();
+    updateCompletion();
+  }
+}
 function clearFormNoConfirm(){
   snackMealNames=['snacks'];buildMeals();lastCollectedMeals={};
   document.querySelectorAll('input[type=text],input[type=number],input[type=time],textarea').forEach(x=>x.value='');
   document.querySelectorAll('select').forEach(x=>x.value='');
   document.querySelectorAll('input[type=checkbox]').forEach(x=>x.checked=false);
   currentMealNames().forEach(m=>{const p=document.getElementById(m+'_preview');p.src='';p.dataset.image='';p.style.display='none';updateMealSummary(m)});
-  syncQuickChoices();updateCompletion();
+  syncQuickChoices();
+  updateDoseDayFields();
+  updateCompletion();
 }
 
 window.changeCounter=function(id,delta){
@@ -936,6 +963,8 @@ function applySettings(){
   const weightLabel=document.querySelector('label[for="weight"]');
   if(weightLabel) weightLabel.textContent=`Weight${s.weightUnit?` (${s.weightUnit})`:''}`;
   updateDoseDayBadge();
+  updateDoseDayFields();
+  updateCompletion();
 }
 window.openSetup=function(){
   const s=getSettings();
@@ -1437,6 +1466,8 @@ async function init(){
   syncQuickChoices();updateCompletion();
   currentLoadedDate=document.getElementById('entryDate').value;
   applySettings();
+  updateDoseDayFields();
+  updateCompletion();
   if(!localStorage.getItem('glp1Settings') || !localStorage.getItem('glp1SetupV6')){
     openSetup();
     localStorage.setItem('glp1SetupV6','shown');
