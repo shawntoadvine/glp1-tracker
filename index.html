@@ -99,7 +99,107 @@
     .undo-toast{position:fixed;left:50%;bottom:100px;transform:translateX(-50%);background:#111827;color:#fff;border-radius:999px;padding:10px 14px;z-index:50;display:none;gap:10px;align-items:center}
     .undo-toast.show{display:flex}
     .undo-toast button{border:0;background:#fff;color:#111827;border-radius:999px;padding:5px 9px;font-weight:700}
-  </style>
+  
+/* ===== Version 16: Game Mode ===== */
+:root{
+  --game-navy:#10254f;
+  --game-blue:#2f67e8;
+  --game-gold:#f7b733;
+  --game-purple:#7b4ce2;
+  --game-green:#38a169;
+  --game-cream:#fffaf0;
+}
+.game-hero{
+  background:
+    radial-gradient(circle at 70% 20%,rgba(81,163,255,.45),transparent 32%),
+    linear-gradient(135deg,#eaf4ff 0%,#f9fbff 45%,#fff7e8 100%);
+  border:2px solid #d9e6ff;
+  border-radius:24px;
+  padding:16px;
+  margin:0 0 16px;
+  box-shadow:0 10px 30px rgba(16,37,79,.12);
+  overflow:hidden;
+}
+.game-topline{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.game-title{font-size:2rem;font-weight:900;color:var(--game-navy);line-height:1}
+.coin-box,.streak-box,.level-box{
+  display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #dce7f7;
+  border-radius:16px;padding:8px 12px;font-weight:800;color:var(--game-navy);
+  box-shadow:0 4px 12px rgba(16,37,79,.08)
+}
+.game-profile{display:grid;grid-template-columns:118px 1fr;gap:14px;align-items:center;margin-top:12px}
+.game-avatar{
+  width:118px;height:118px;border-radius:50%;object-fit:cover;
+  border:5px solid #fff;box-shadow:0 0 0 4px var(--game-blue),0 10px 24px rgba(0,0,0,.18)
+}
+.level-shield{
+  display:inline-flex;flex-direction:column;align-items:center;justify-content:center;
+  min-width:86px;padding:8px 12px;border-radius:18px;
+  background:linear-gradient(180deg,#2d6be9,#12367d);color:#fff;border:3px solid #f6c453;
+  box-shadow:0 6px 18px rgba(18,54,125,.25)
+}
+.level-shield small{font-weight:800;letter-spacing:.05em}
+.level-shield strong{font-size:2rem;line-height:1}
+.xp-wrap{margin-top:10px}
+.xp-label{display:flex;justify-content:space-between;font-size:.85rem;font-weight:800;color:var(--game-navy)}
+.xp-track{height:14px;background:#dfe8f7;border-radius:999px;overflow:hidden;border:1px solid #c9d6eb}
+.xp-fill{height:100%;width:0;background:linear-gradient(90deg,#2f67e8,#4dc6ff);transition:width .35s ease}
+.game-banner{
+  margin-top:10px;background:#fff;border-radius:16px;padding:10px 12px;
+  color:var(--game-navy);font-weight:700;border:1px solid #dce7f7
+}
+.quest-board{
+  background:linear-gradient(180deg,#fff,#fbfbff);border:2px solid #e4ddff;border-radius:22px;
+  padding:14px;margin:0 0 16px;box-shadow:0 8px 24px rgba(65,43,140,.08)
+}
+.quest-board h2{margin:0 0 10px;color:#4c2ca3}
+.quest-item{
+  display:grid;grid-template-columns:34px 1fr auto;gap:10px;align-items:center;
+  background:#fff;border:1px solid #e8e8f5;border-radius:14px;padding:10px;margin:8px 0
+}
+.quest-icon{font-size:1.4rem}
+.quest-title{font-weight:800;color:#1f2a44}
+.quest-xp{font-size:.8rem;color:#2d8b57;font-weight:800}
+.quest-check{
+  width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  border:2px solid #cbd5e1;color:#94a3b8;font-weight:900
+}
+.quest-check.done{background:#39b86b;border-color:#39b86b;color:white}
+.daily-bonus{
+  margin-top:10px;background:linear-gradient(135deg,#6d3be3,#9f54ff);color:white;
+  border-radius:16px;padding:12px;font-weight:900;text-align:center
+}
+.game-stats{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px
+}
+.game-stat{background:#fff;border:1px solid #dce7f7;border-radius:14px;padding:9px;text-align:center}
+.game-stat strong{display:block;font-size:1.25rem;color:var(--game-navy)}
+.game-stat span{font-size:.75rem;color:#6b7280}
+.achievement-row{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px}
+.achievement{
+  min-width:120px;background:#fff;border:1px solid #eadfbd;border-radius:16px;
+  padding:10px;text-align:center
+}
+.achievement .badge{font-size:2rem}
+.achievement strong{display:block;color:#6f4b00;font-size:.85rem}
+.achievement small{color:#777}
+.level-up-pop{
+  position:fixed;inset:0;background:rgba(7,19,46,.72);z-index:9999;display:none;
+  align-items:center;justify-content:center;padding:24px
+}
+.level-up-card{
+  max-width:360px;width:100%;background:linear-gradient(180deg,#fff,#fff7db);
+  border:4px solid var(--game-gold);border-radius:28px;padding:24px;text-align:center;
+  box-shadow:0 20px 60px rgba(0,0,0,.35)
+}
+.level-up-card h2{font-size:2rem;margin:0;color:var(--game-navy)}
+@media(max-width:480px){
+  .game-profile{grid-template-columns:94px 1fr}
+  .game-avatar{width:94px;height:94px}
+  .game-stats{grid-template-columns:repeat(3,1fr)}
+}
+
+</style>
 </head>
 <body>
 <div class="app">
@@ -110,7 +210,60 @@
     </div>
   </div>
 
-  <section id="today" class="screen active">
+  
+<section id="today" class="screen active">
+  <div class="game-hero">
+    <div class="game-topline">
+      <div>
+        <div class="tiny">TODAY</div>
+        <div class="game-title">Daily Quest</div>
+      </div>
+      <div class="coin-box">🪙 <span id="gameCoins">0</span></div>
+    </div>
+
+    <div class="game-profile">
+      <img src="avatar.png" alt="Player avatar" class="game-avatar">
+      <div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <div class="level-shield">
+            <small>LEVEL</small>
+            <strong id="gameLevel">1</strong>
+            <small>GLP-1 HERO</small>
+          </div>
+          <div class="streak-box">🔥 <span><strong id="gameStreak">0</strong><br><small>day streak</small></span></div>
+        </div>
+        <div class="xp-wrap">
+          <div class="xp-label"><span>XP</span><span id="gameXpText">0 / 500</span></div>
+          <div class="xp-track"><div id="gameXpFill" class="xp-fill"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="game-banner" id="gameEncouragement">Every honest entry strengthens your character.</div>
+
+    <div class="game-stats">
+      <div class="game-stat"><strong id="gameSleep">—</strong><span>Sleep</span></div>
+      <div class="game-stat"><strong id="gameWater">0</strong><span>Water</span></div>
+      <div class="game-stat"><strong id="gameSleepScore">—</strong><span>Sleep Score</span></div>
+    </div>
+  </div>
+
+  <div class="quest-board">
+    <h2>⚔️ Today’s Quests</h2>
+    <div id="questList"></div>
+    <div id="dailyBonus" class="daily-bonus">🏆 Complete every quest for +100 bonus XP</div>
+  </div>
+
+  <div class="quest-board">
+    <h2>🏅 Milestones</h2>
+    <div class="achievement-row">
+      <div class="achievement"><div class="badge">🔥</div><strong>Tracking Streak</strong><small id="badgeStreak">0 days</small></div>
+      <div class="achievement"><div class="badge">💧</div><strong>Hydration Hero</strong><small id="badgeWater">Start today</small></div>
+      <div class="achievement"><div class="badge">👟</div><strong>Step Warrior</strong><small id="badgeSteps">0 steps</small></div>
+      <div class="achievement"><div class="badge">🛡️</div><strong>Check-In Guard</strong><small id="badgeCheckin">Not yet</small></div>
+    </div>
+  </div>
+
     <div class="card">
       <h2>Quick Add</h2>
       <div class="quick-home">
@@ -1216,6 +1369,7 @@ function updateCompletion(){
   const b=document.getElementById('completionBar');
   if(t)t.textContent=pct+'% complete';
   if(b)b.style.width=pct+'%';
+  renderGameLayer();
 }
 document.addEventListener('input',e=>{updateCompletion();if(e.target.id!=='restoreFile')scheduleAutosave()});
 document.addEventListener('change',e=>{updateCompletion();if(e.target.id!=='restoreFile')scheduleAutosave()});
@@ -1254,6 +1408,7 @@ window.saveSetup=function(){
   localStorage.setItem('glp1Settings',JSON.stringify(s));
   document.getElementById('setupOverlay').classList.remove('show');
   applySettings();
+  renderGameLayer();
 }
 function updateDoseDayBadge(){
   const badge=document.getElementById('doseDayBadge');
@@ -1284,6 +1439,7 @@ async function autosaveNow(){
   if(status)status.textContent='✓ Saved automatically';
   updateCompletion();
   updateStorageInfo();
+  awardTodayGameProgress();
 }
 window.quickWater=function(){
   const el=document.getElementById('water');
@@ -1730,6 +1886,145 @@ document.addEventListener('change',e=>{
   if(e.target?.id==='entryDate'){ updateDoseDayFields(); updateCompletion(); }
 });
 
+
+const GAME_KEY='glp1GameStateV16';
+
+function getGameState(){
+  try{
+    return JSON.parse(localStorage.getItem(GAME_KEY)) || {
+      xp:0,coins:0,level:1,streak:0,lastQuestDate:'',completedDates:[]
+    };
+  }catch(e){
+    return {xp:0,coins:0,level:1,streak:0,lastQuestDate:'',completedDates:[]};
+  }
+}
+
+function saveGameState(state){
+  localStorage.setItem(GAME_KEY,JSON.stringify(state));
+}
+
+function levelForXp(xp){
+  return Math.floor(xp/500)+1;
+}
+
+function questStatus(){
+  const hasSleep=parseFloat(document.getElementById('sleep')?.value||'0')>0;
+  const hasWater=parseInt(document.getElementById('water')?.value||'0',10)>0;
+  const hasCheckin=!!document.getElementById('hunger')?.value && !!document.getElementById('energy')?.value;
+  const hasMeal=currentMealNames().some(m=>document.getElementById(m+'_desc')?.value.trim());
+  const hasActivity=parseInt(document.getElementById('steps')?.value||'0',10)>0 ||
+    parseFloat(document.getElementById('exerciseMinutes')?.value||'0')>0;
+
+  let doseDone=true;
+  const entryDate=document.getElementById('entryDate')?.value;
+  if(entryDate){
+    const selected=new Date(`${entryDate}T12:00:00`);
+    if(selected.getDay()===getConfiguredDoseDay()){
+      doseDone=!!document.getElementById('dose')?.value &&
+        !!document.getElementById('injectionTime')?.value &&
+        !!document.getElementById('injectionSite')?.value;
+    }
+  }
+
+  return [
+    {id:'sleep',icon:'🌙',title:'Log sleep',xp:20,done:hasSleep},
+    {id:'water',icon:'💧',title:'Track water',xp:20,done:hasWater},
+    {id:'meal',icon:'🍽️',title:'Log a meal',xp:30,done:hasMeal},
+    {id:'checkin',icon:'❤️',title:'Complete Check-In',xp:30,done:hasCheckin},
+    {id:'activity',icon:'👟',title:'Import or log activity',xp:30,done:hasActivity},
+    {id:'dose',icon:'🧪',title:'Complete dose-day details',xp:40,done:doseDone}
+  ];
+}
+
+function renderGameLayer(){
+  const quests=questStatus();
+  const list=document.getElementById('questList');
+  if(list){
+    list.innerHTML=quests.map(q=>`
+      <div class="quest-item">
+        <div class="quest-icon">${q.icon}</div>
+        <div><div class="quest-title">${q.title}</div><div class="quest-xp">+${q.xp} XP</div></div>
+        <div class="quest-check ${q.done?'done':''}">${q.done?'✓':''}</div>
+      </div>`).join('');
+  }
+
+  const state=getGameState();
+  const level=levelForXp(state.xp);
+  state.level=level;
+  saveGameState(state);
+
+  const xpInto=state.xp%500;
+  const levelEl=document.getElementById('gameLevel');
+  const coinsEl=document.getElementById('gameCoins');
+  const streakEl=document.getElementById('gameStreak');
+  const xpText=document.getElementById('gameXpText');
+  const xpFill=document.getElementById('gameXpFill');
+  if(levelEl)levelEl.textContent=level;
+  if(coinsEl)coinsEl.textContent=state.coins;
+  if(streakEl)streakEl.textContent=state.streak;
+  if(xpText)xpText.textContent=`${xpInto} / 500`;
+  if(xpFill)xpFill.style.width=`${Math.round(xpInto/500*100)}%`;
+
+  const sleep=parseFloat(document.getElementById('sleep')?.value||'0');
+  const water=parseInt(document.getElementById('water')?.value||'0',10);
+  const score=document.getElementById('sleepScore')?.value;
+  const settings=getSettings();
+  if(document.getElementById('gameSleep'))document.getElementById('gameSleep').textContent=sleep?`${sleep.toFixed(1)}h`:'—';
+  if(document.getElementById('gameWater'))document.getElementById('gameWater').textContent=`${water*(settings.waterOz||12)} oz`;
+  if(document.getElementById('gameSleepScore'))document.getElementById('gameSleepScore').textContent=score||'—';
+
+  const allDone=quests.every(q=>q.done);
+  const bonus=document.getElementById('dailyBonus');
+  if(bonus){
+    bonus.textContent=allDone?'🎉 Daily Quest Complete! Bonus ready.':'🏆 Complete every quest for +100 bonus XP';
+  }
+
+  const steps=parseInt(document.getElementById('steps')?.value||'0',10);
+  if(document.getElementById('badgeStreak'))document.getElementById('badgeStreak').textContent=`${state.streak} days`;
+  if(document.getElementById('badgeWater'))document.getElementById('badgeWater').textContent=water>0?`${water*(settings.waterOz||12)} oz today`:'Start today';
+  if(document.getElementById('badgeSteps'))document.getElementById('badgeSteps').textContent=`${steps.toLocaleString()} steps`;
+  if(document.getElementById('badgeCheckin'))document.getElementById('badgeCheckin').textContent=quests.find(q=>q.id==='checkin').done?'Completed':'Not yet';
+}
+
+function awardTodayGameProgress(){
+  const entryDate=document.getElementById('entryDate')?.value||todayISO();
+  const state=getGameState();
+  const quests=questStatus();
+  const allDone=quests.every(q=>q.done);
+
+  if(!state.completedDates.includes(entryDate) && allDone){
+    const oldLevel=levelForXp(state.xp);
+    const earned=quests.reduce((sum,q)=>sum+q.xp,0)+100;
+    state.xp+=earned;
+    state.coins+=Math.round(earned/10);
+    state.completedDates.push(entryDate);
+
+    const yesterday=new Date(`${entryDate}T12:00:00`);
+    yesterday.setDate(yesterday.getDate()-1);
+    const yesterdayISO=yesterday.toISOString().slice(0,10);
+    state.streak=state.lastQuestDate===yesterdayISO ? state.streak+1 : 1;
+    state.lastQuestDate=entryDate;
+
+    const newLevel=levelForXp(state.xp);
+    saveGameState(state);
+
+    if(newLevel>oldLevel){
+      const pop=document.getElementById('levelUpPop');
+      const text=document.getElementById('levelUpText');
+      if(text)text.textContent=`You reached Level ${newLevel}: GLP-1 Hero!`;
+      if(pop)pop.style.display='flex';
+    }
+  }
+
+  renderGameLayer();
+}
+
+window.closeLevelUp=function(){
+  const pop=document.getElementById('levelUpPop');
+  if(pop)pop.style.display='none';
+}
+
+
 async function init(){
   buildMeals();bindQuickChoices();await openDB();document.getElementById('entryDate').value=todayISO();updateTopDate();
   document.getElementById('entryDate').addEventListener('change',e=>loadDate(e.target.value));
@@ -1751,5 +2046,15 @@ async function init(){
 }
 init();
 </script>
+
+<div id="levelUpPop" class="level-up-pop">
+  <div class="level-up-card">
+    <div style="font-size:4rem">✨🏆✨</div>
+    <h2>LEVEL UP!</h2>
+    <p id="levelUpText">You reached a new level.</p>
+    <button class="btn primary" onclick="closeLevelUp()">Continue Quest</button>
+  </div>
+</div>
+
 </body>
 </html>
