@@ -189,7 +189,7 @@
 
   <section id="meals" class="screen">
     <div class="section-note">
-      Open one meal at a time. Take a photo, copy the ChatGPT prompt, attach the same photo in ChatGPT, and paste the result back here. The photo is removed from the tracker after you save.
+      Open one meal at a time. Take a new photo or choose one from your library, then share it with ChatGPT and paste the result back here. The photo is removed from the tracker after you save.
     </div>
     <div class="meal-list" id="mealList"></div>
     <div class="actions"><button class="btn primary" onclick="saveAllMealsAndClose()">Save All Meals</button></div>
@@ -381,7 +381,11 @@ function buildMeals(){
           <div><label>What did you eat?</label><input id="${meal}_desc" type="text"></div>
           <div><label>Portion</label><select id="${meal}_portion"><option value="">Select</option><option>Small</option><option>Medium</option><option>Large</option><option>Very large</option></select></div>
           <div><label>Approximate amount</label><input id="${meal}_amount" type="text" placeholder="2 eggs, 1 cup, 5 oz"></div>
-          <div><label>Meal photo</label><input id="${meal}_photo" type="file" accept="image/*" capture="environment"></div>
+          <div>
+  <label>Add Meal Photo</label>
+  <input id="${meal}_photo" type="file" accept="image/*">
+  <div class="tiny">Choose Take Photo, Photo Library, or Files when your iPhone asks.</div>
+</div>
         </div>
         <img id="${meal}_preview" class="preview">
         <div class="ai-box">
