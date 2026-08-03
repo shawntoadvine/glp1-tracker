@@ -199,6 +199,296 @@
   .game-stats{grid-template-columns:repeat(3,1fr)}
 }
 
+
+.calorie-today-card{
+  margin-top:12px;
+  background:linear-gradient(135deg,#fff7e6,#ffffff);
+  border:2px solid #ffd28a;
+  border-radius:18px;
+  padding:12px 14px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  cursor:pointer;
+  box-shadow:0 6px 16px rgba(161,98,7,.10);
+}
+.calorie-today-card:active{transform:scale(.99)}
+.calorie-today-main{display:flex;align-items:center;gap:10px}
+.calorie-today-icon{font-size:2rem}
+.calorie-today-label{font-size:.8rem;color:#8a5a00;font-weight:800;text-transform:uppercase}
+.calorie-today-value{font-size:1.65rem;font-weight:900;color:#5f3b00}
+.calorie-breakdown-pop{
+  position:fixed;inset:0;background:rgba(7,19,46,.72);z-index:9998;display:none;
+  align-items:center;justify-content:center;padding:24px
+}
+.calorie-breakdown-card{
+  max-width:380px;width:100%;background:#fff;border-radius:24px;padding:20px;
+  box-shadow:0 24px 70px rgba(0,0,0,.35);border:3px solid #ffd28a
+}
+.calorie-breakdown-card h2{margin:0 0 12px;color:#5f3b00}
+.calorie-row{
+  display:flex;justify-content:space-between;gap:12px;padding:10px 0;
+  border-bottom:1px solid #eee
+}
+.calorie-row:last-child{border-bottom:0}
+.calorie-total-row{
+  margin-top:8px;padding-top:12px;border-top:2px solid #ffd28a;
+  font-size:1.15rem;font-weight:900;color:#5f3b00
+}
+
+
+/* ===== Version 17: Full Game Redesign ===== */
+:root{
+  --v17-navy:#071a38;
+  --v17-navy-2:#0d2b5b;
+  --v17-blue:#2e6cf6;
+  --v17-blue-bright:#4fb5ff;
+  --v17-gold:#f6bd3e;
+  --v17-gold-dark:#b87907;
+  --v17-purple:#7a42df;
+  --v17-green:#39b96d;
+  --v17-orange:#ff8b2c;
+  --v17-cream:#fffaf0;
+  --v17-card:#fffdf8;
+  --v17-text:#102143;
+}
+
+/* Overall app background */
+body{
+  background:
+    radial-gradient(circle at 50% -10%, rgba(79,181,255,.28), transparent 28%),
+    linear-gradient(180deg,#eaf4ff 0%,#f7fbff 45%,#eef4fb 100%);
+  color:var(--v17-text);
+}
+main,.screen{background:transparent!important}
+.screen{padding-bottom:110px}
+
+/* Hero becomes much more prominent */
+.game-hero{
+  position:relative;
+  background:
+    linear-gradient(180deg,rgba(7,26,56,.08),rgba(7,26,56,.22)),
+    radial-gradient(circle at 35% 30%,rgba(77,198,255,.55),transparent 30%),
+    linear-gradient(135deg,#dff1ff 0%,#e8f3ff 44%,#fff2cf 100%);
+  border:3px solid #f5c85c;
+  border-radius:28px;
+  padding:18px;
+  margin:0 0 18px;
+  box-shadow:0 14px 34px rgba(7,26,56,.18), inset 0 0 0 1px rgba(255,255,255,.8);
+  overflow:hidden;
+}
+.game-hero:before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:
+    radial-gradient(circle at 22% 24%,rgba(255,255,255,.45),transparent 22%),
+    radial-gradient(circle at 82% 8%,rgba(246,189,62,.22),transparent 20%);
+  pointer-events:none;
+}
+.game-topline,.game-profile,.game-banner,.game-stats,.calorie-today-card{position:relative;z-index:1}
+.game-title{
+  font-size:2.15rem;
+  color:#fff;
+  text-shadow:0 3px 0 #0a2b65,0 6px 14px rgba(0,0,0,.28);
+  letter-spacing:.01em;
+}
+.game-topline .tiny{
+  display:inline-block;
+  background:linear-gradient(180deg,#3e7ef5,#174bb8);
+  color:#fff;
+  padding:5px 16px;
+  border-radius:999px;
+  border:2px solid var(--v17-gold);
+  box-shadow:0 4px 10px rgba(13,43,91,.22);
+  font-weight:900;
+}
+.coin-box{
+  background:linear-gradient(180deg,#fff7cc,#ffd45e);
+  border:2px solid var(--v17-gold-dark);
+  color:#684400;
+  box-shadow:0 5px 14px rgba(112,72,0,.22)
+}
+.game-profile{
+  grid-template-columns:150px 1fr;
+  gap:18px;
+  margin-top:16px
+}
+.game-avatar{
+  width:150px;
+  height:150px;
+  border:6px solid #fff8dc;
+  box-shadow:
+    0 0 0 5px var(--v17-gold),
+    0 0 0 9px #245fd5,
+    0 12px 28px rgba(0,0,0,.26);
+}
+.level-shield{
+  min-width:110px;
+  padding:10px 14px;
+  border-radius:20px;
+  background:linear-gradient(180deg,#3479f5 0%,#0d3d98 100%);
+  border:4px solid var(--v17-gold);
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.2),0 8px 20px rgba(14,49,114,.3)
+}
+.level-shield strong{font-size:2.45rem}
+.streak-box{
+  background:linear-gradient(180deg,#14284b,#08182f);
+  color:#fff;
+  border:2px solid var(--v17-gold);
+  min-width:112px
+}
+.xp-label{color:#0d2b5b;font-size:.92rem}
+.xp-track{
+  height:18px;
+  background:#0a1e3e;
+  border:2px solid #f7c24a;
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.08)
+}
+.xp-fill{background:linear-gradient(90deg,#2494ff,#59d8ff)}
+.game-banner{
+  background:linear-gradient(180deg,#fffefa,#fff4d6);
+  border:2px solid #d7ad49;
+  color:#273555;
+  box-shadow:0 7px 18px rgba(86,55,0,.12)
+}
+
+/* Overview */
+.game-stats{
+  grid-template-columns:repeat(3,1fr);
+  gap:10px
+}
+.game-stat{
+  border:2px solid #d7e4fa;
+  box-shadow:0 4px 12px rgba(16,42,92,.08)
+}
+.calorie-today-card{
+  background:linear-gradient(135deg,#fff7df,#ffffff);
+  border:3px solid #ffad3d;
+  box-shadow:0 7px 18px rgba(194,107,0,.15)
+}
+
+/* Ribbon section headers */
+.quest-board{
+  position:relative;
+  border-radius:24px;
+  border:3px solid #d8dff2;
+  background:linear-gradient(180deg,#fffefc,#f7f9ff);
+  box-shadow:0 12px 28px rgba(7,26,56,.12);
+  overflow:visible;
+  padding-top:22px;
+}
+.quest-board h2{
+  display:inline-block;
+  margin:-38px 0 12px -6px;
+  padding:8px 22px 8px 18px;
+  color:#fff;
+  background:linear-gradient(180deg,#7d50eb,#5a26b9);
+  border:2px solid #d6b7ff;
+  border-radius:6px 16px 16px 6px;
+  box-shadow:0 5px 14px rgba(71,32,139,.25);
+  text-shadow:0 2px 0 rgba(0,0,0,.25);
+}
+.quest-board:nth-of-type(3) h2{
+  background:linear-gradient(180deg,#2f7de8,#164a9f);
+  border-color:#95c8ff
+}
+.quest-item{
+  background:linear-gradient(180deg,#fff,#f9fbff);
+  border:2px solid #e1e7f2;
+  box-shadow:0 4px 10px rgba(15,38,83,.06);
+  padding:12px;
+}
+.quest-icon{
+  width:36px;height:36px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  background:#eef5ff;border:1px solid #cddcf3
+}
+.quest-check{
+  border-width:3px;
+  background:#fff
+}
+.quest-check.done{
+  background:linear-gradient(180deg,#4cd27c,#249c51);
+  border-color:#17793d;
+  box-shadow:0 3px 8px rgba(38,156,81,.24)
+}
+.daily-bonus{
+  border:2px solid #c89cff;
+  box-shadow:0 8px 18px rgba(91,38,181,.2)
+}
+
+/* Achievements */
+.achievement{
+  min-width:132px;
+  border:2px solid #ead9ab;
+  background:linear-gradient(180deg,#fffdfa,#fff6db);
+  box-shadow:0 5px 14px rgba(100,67,0,.08)
+}
+.achievement .badge{
+  font-size:2.5rem;
+  filter:drop-shadow(0 4px 4px rgba(0,0,0,.15))
+}
+
+/* Existing tracker cards */
+.card,.meal-summary,.ai-box,.section-note{
+  border-radius:22px!important;
+  border:2px solid #dbe5f4!important;
+  box-shadow:0 8px 20px rgba(12,39,88,.08)!important;
+}
+.card h2,.meal-summary h3{
+  color:#132a58
+}
+.btn.primary{
+  background:linear-gradient(180deg,#3d7cf4,#1f55c7)!important;
+  border:2px solid #123a92!important;
+  box-shadow:0 5px 12px rgba(31,85,199,.22)!important
+}
+.btn.success{
+  background:linear-gradient(180deg,#55d888,#2ea85e)!important;
+  border:2px solid #21844a!important
+}
+.btn.secondary{
+  background:linear-gradient(180deg,#f8fbff,#e9eff8)!important;
+  border:2px solid #d1dbea!important
+}
+
+/* Dark game navigation */
+.bottom-nav{
+  background:linear-gradient(180deg,#102c5a,#071a38)!important;
+  border-top:3px solid #2e6cf6!important;
+  box-shadow:0 -8px 22px rgba(7,26,56,.28)!important;
+  padding-top:8px!important
+}
+.bottom-nav button{
+  color:#fff!important;
+  background:transparent!important;
+  border-radius:16px!important
+}
+.bottom-nav button.active{
+  background:linear-gradient(180deg,#285fb9,#12376f)!important;
+  border:1px solid #4fa8ff!important;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.08),0 0 16px rgba(79,168,255,.28)!important
+}
+.bottom-nav .icon{font-size:1.55rem!important}
+
+/* Level-up */
+.level-up-card{
+  background:linear-gradient(180deg,#fffdf4,#fff2c4);
+  border:5px solid var(--v17-gold);
+  box-shadow:0 24px 80px rgba(0,0,0,.45)
+}
+
+/* Small screens */
+@media(max-width:480px){
+  .game-profile{grid-template-columns:116px 1fr}
+  .game-avatar{width:116px;height:116px}
+  .level-shield{min-width:92px}
+  .level-shield strong{font-size:2rem}
+  .game-title{font-size:1.85rem}
+}
+
 </style>
 </head>
 <body>
@@ -231,6 +521,7 @@
             <small>GLP-1 HERO</small>
           </div>
           <div class="streak-box">🔥 <span><strong id="gameStreak">0</strong><br><small>day streak</small></span></div>
+          <div class="streak-box">🎁 <span><strong id="nextRewardDays">5</strong><br><small>days to reward</small></span></div>
         </div>
         <div class="xp-wrap">
           <div class="xp-label"><span>XP</span><span id="gameXpText">0 / 500</span></div>
@@ -246,12 +537,52 @@
       <div class="game-stat"><strong id="gameWater">0</strong><span>Water</span></div>
       <div class="game-stat"><strong id="gameSleepScore">—</strong><span>Sleep Score</span></div>
     </div>
+
+    <button type="button" class="calorie-today-card" onclick="openCaloriesBreakdown()">
+      <div class="calorie-today-main">
+        <div class="calorie-today-icon">🔥</div>
+        <div>
+          <div class="calorie-today-label">Calories Today</div>
+          <div class="calorie-today-value"><span id="gameCaloriesToday">0</span> cal</div>
+        </div>
+      </div>
+      <div style="font-weight:900;color:#8a5a00;">View breakdown ›</div>
+    </button>
+  </div>
+
+
+  <div class="quest-board" id="gameOverviewBoard">
+    <h2>📊 Daily Overview</h2>
+    <div class="game-stats" style="grid-template-columns:repeat(3,1fr)">
+      <div class="game-stat"><div style="font-size:1.7rem">🌙</div><strong id="overviewSleep">—</strong><span>Sleep</span></div>
+      <div class="game-stat"><div style="font-size:1.7rem">💧</div><strong id="overviewWater">0 oz</strong><span>Water</span></div>
+      <div class="game-stat"><div style="font-size:1.7rem">🍽️</div><strong id="overviewHunger">—</strong><span>Hunger Today</span></div>
+      <div class="game-stat"><div style="font-size:1.7rem">⚡</div><strong id="overviewEnergy">—</strong><span>Energy</span></div>
+      <div class="game-stat"><div style="font-size:1.7rem">🛡️</div><strong id="overviewSleepScore">—</strong><span>Sleep Score</span></div>
+      <div class="game-stat"><div style="font-size:1.7rem">🔥</div><strong id="overviewCalories">0</strong><span>Calories Today</span></div>
+    </div>
+  </div>
+
+  <div class="quest-board" id="gameMealsProgressBoard">
+    <h2>🍴 Meals Progress</h2>
+    <div id="gameMealsProgress" class="game-stats" style="grid-template-columns:repeat(4,1fr)"></div>
   </div>
 
   <div class="quest-board">
     <h2>⚔️ Today’s Quests</h2>
     <div id="questList"></div>
     <div id="dailyBonus" class="daily-bonus">🏆 Complete every quest for +100 bonus XP</div>
+  </div>
+
+
+  <div class="quest-board" id="gameActivityBoard">
+    <h2>👟 Activity</h2>
+    <div class="game-stats" style="grid-template-columns:repeat(4,1fr)">
+      <div class="game-stat"><div style="font-size:1.6rem">👟</div><strong id="overviewSteps">0</strong><span>Steps</span></div>
+      <div class="game-stat"><div style="font-size:1.6rem">🔥</div><strong id="overviewActiveCalories">0</strong><span>Active Calories</span></div>
+      <div class="game-stat"><div style="font-size:1.6rem">❤️</div><strong id="overviewHeartRate">—</strong><span>Heart Rate</span></div>
+      <div class="game-stat"><button class="btn primary" onclick="runHealthShortcut()">Import Apple Health</button></div>
+    </div>
   </div>
 
   <div class="quest-board">
@@ -782,7 +1113,21 @@ function fillQuickDrinkMeal(meal,data){
   }
 }
 
+
+function ensureCoffeeQuickAddDefaults(){
+  const cups=document.getElementById('quickCoffeeCups');
+  const creamer=document.getElementById('quickCoffeeCreamer');
+
+  if(cups && (cups.value==='' || Number(cups.value)<=0)){
+    cups.value='1';
+  }
+  if(creamer && creamer.value===''){
+    creamer.value='2';
+  }
+}
+
 window.quickAddCoffee=function(){
+  ensureCoffeeQuickAddDefaults();
   const cups=Math.max(0,parseFloat(document.getElementById('quickCoffeeCups')?.value||'1'));
   const creamer=Math.max(0,parseFloat(document.getElementById('quickCoffeeCreamer')?.value||'0'));
 
@@ -817,6 +1162,10 @@ window.quickAddCoffee=function(){
   }else{
     fillQuickDrinkMeal(findAvailableSnackMeal(),data);
   }
+  const cupsField=document.getElementById('quickCoffeeCups');
+  const creamerField=document.getElementById('quickCoffeeCreamer');
+  if(cupsField) cupsField.value='1';
+  if(creamerField) creamerField.value='2';
 }
 
 window.updateBeerCaloriesPreset=function(){
@@ -874,6 +1223,7 @@ window.quickAddBeer=function(){
 }
 
 function buildMeals(){
+  setTimeout(ensureCoffeeQuickAddDefaults,0);
   const holder=document.getElementById('mealList');
   if(!holder) return;
 
@@ -1936,7 +2286,55 @@ function questStatus(){
   ];
 }
 
+
+function mealCaloriesBreakdown(){
+  return currentMealNames().map(meal=>{
+    const calories=Number(document.getElementById(`${meal}_calories`)?.value||0);
+    return {
+      meal,
+      title:mealTitle(meal),
+      calories:Number.isFinite(calories)?Math.max(0,calories):0
+    };
+  }).filter(item=>item.calories>0);
+}
+
+function caloriesTodayTotal(){
+  return mealCaloriesBreakdown().reduce((sum,item)=>sum+item.calories,0);
+}
+
+window.openCaloriesBreakdown=function(){
+  const list=document.getElementById('calorieBreakdownList');
+  const pop=document.getElementById('calorieBreakdownPop');
+  if(!list||!pop)return;
+
+  const items=mealCaloriesBreakdown();
+  const total=items.reduce((sum,item)=>sum+item.calories,0);
+
+  if(items.length){
+    list.innerHTML=items.map(item=>`
+      <div class="calorie-row">
+        <span>${item.title}</span>
+        <strong>${Math.round(item.calories).toLocaleString()} cal</strong>
+      </div>
+    `).join('')+`
+      <div class="calorie-row calorie-total-row">
+        <span>Total</span>
+        <strong>${Math.round(total).toLocaleString()} cal</strong>
+      </div>`;
+  }else{
+    list.innerHTML='<div class="muted">No meal calories have been logged yet.</div>';
+  }
+
+  pop.style.display='flex';
+}
+
+window.closeCaloriesBreakdown=function(){
+  const pop=document.getElementById('calorieBreakdownPop');
+  if(pop)pop.style.display='none';
+}
+
 function renderGameLayer(){
+  setTimeout(renderVersion17Panels,0);
   const quests=questStatus();
   const list=document.getElementById('questList');
   if(list){
@@ -1972,6 +2370,9 @@ function renderGameLayer(){
   if(document.getElementById('gameSleep'))document.getElementById('gameSleep').textContent=sleep?`${sleep.toFixed(1)}h`:'—';
   if(document.getElementById('gameWater'))document.getElementById('gameWater').textContent=`${water*(settings.waterOz||12)} oz`;
   if(document.getElementById('gameSleepScore'))document.getElementById('gameSleepScore').textContent=score||'—';
+  const caloriesTotal=caloriesTodayTotal();
+  const caloriesEl=document.getElementById('gameCaloriesToday');
+  if(caloriesEl)caloriesEl.textContent=Math.round(caloriesTotal).toLocaleString();
 
   const allDone=quests.every(q=>q.done);
   const bonus=document.getElementById('dailyBonus');
@@ -1984,6 +2385,74 @@ function renderGameLayer(){
   if(document.getElementById('badgeWater'))document.getElementById('badgeWater').textContent=water>0?`${water*(settings.waterOz||12)} oz today`:'Start today';
   if(document.getElementById('badgeSteps'))document.getElementById('badgeSteps').textContent=`${steps.toLocaleString()} steps`;
   if(document.getElementById('badgeCheckin'))document.getElementById('badgeCheckin').textContent=quests.find(q=>q.id==='checkin').done?'Completed':'Not yet';
+}
+
+
+function renderVersion17Panels(){
+  const settings=getSettings();
+  const sleep=parseFloat(document.getElementById('sleep')?.value||'0');
+  const water=parseInt(document.getElementById('water')?.value||'0',10);
+  const hunger=document.getElementById('hunger')?.value||'';
+  const energy=document.getElementById('energy')?.value||'';
+  const sleepScore=document.getElementById('sleepScore')?.value||'';
+  const calories=caloriesTodayTotal();
+  const steps=parseInt(document.getElementById('steps')?.value||'0',10);
+  const activeCalories=parseFloat(document.getElementById('activeCalories')?.value||'0');
+  const heartRate=parseFloat(document.getElementById('averageHeartRate')?.value||'0');
+
+  const map={
+    overviewSleep:sleep?`${sleep.toFixed(1)}h`:'—',
+    overviewWater:`${water*(settings.waterOz||12)} oz`,
+    overviewHunger:hunger?`${hunger}/10`:'—',
+    overviewEnergy:energy?`${energy}/10`:'—',
+    overviewSleepScore:sleepScore||'—',
+    overviewCalories:Math.round(calories).toLocaleString(),
+    overviewSteps:steps.toLocaleString(),
+    overviewActiveCalories:Math.round(activeCalories).toLocaleString(),
+    overviewHeartRate:heartRate?`${Math.round(heartRate)} bpm`:'—'
+  };
+
+  Object.entries(map).forEach(([id,value])=>{
+    const el=document.getElementById(id);
+    if(el)el.textContent=value;
+  });
+
+  const mealHolder=document.getElementById('gameMealsProgress');
+  if(mealHolder){
+    const meals=[
+      ['breakfast','☀️','Breakfast'],
+      ['lunch','☀️','Lunch'],
+      ['dinner','🌙','Dinner'],
+      ['snacks','🥤','Snacks/Drinks']
+    ];
+
+    mealHolder.innerHTML=meals.map(([id,icon,label])=>{
+      let done=false;
+      let detail='Not logged';
+      if(id==='snacks'){
+        const count=currentMealNames().filter(m=>m.startsWith('snacks') && document.getElementById(m+'_desc')?.value.trim()).length;
+        done=count>0;
+        detail=count?`${count} logged`:'Not logged';
+      }else{
+        done=!!document.getElementById(id+'_desc')?.value.trim();
+        detail=done?'Logged':'Not logged';
+      }
+      return `<div class="game-stat">
+        <div style="font-size:1.7rem">${icon}</div>
+        <strong style="font-size:.9rem">${label}</strong>
+        <span style="color:${done?'#1d8d49':'#7a8292'}">${done?'✓ ':''}${detail}</span>
+      </div>`;
+    }).join('');
+  }
+
+  const state=getGameState();
+  const nextReward=Math.max(1,5-(state.streak%5));
+  const nextRewardEl=document.getElementById('nextRewardDays');
+  if(nextRewardEl)nextRewardEl.textContent=nextReward;
+}
+
+window.runHealthShortcut=function(){
+  window.location.href='shortcuts://run-shortcut?name=GLP-1%20Health%20Import';
 }
 
 function awardTodayGameProgress(){
@@ -2026,6 +2495,7 @@ window.closeLevelUp=function(){
 
 
 async function init(){
+  setTimeout(ensureCoffeeQuickAddDefaults,0);
   buildMeals();bindQuickChoices();await openDB();document.getElementById('entryDate').value=todayISO();updateTopDate();
   document.getElementById('entryDate').addEventListener('change',e=>loadDate(e.target.value));
   await loadDate(todayISO());
@@ -2046,6 +2516,17 @@ async function init(){
 }
 init();
 </script>
+
+
+<div id="calorieBreakdownPop" class="calorie-breakdown-pop">
+  <div class="calorie-breakdown-card">
+    <h2>🔥 Calories Today</h2>
+    <div id="calorieBreakdownList"></div>
+    <div class="actions" style="margin-top:16px">
+      <button type="button" class="btn primary" onclick="closeCaloriesBreakdown()">Close</button>
+    </div>
+  </div>
+</div>
 
 <div id="levelUpPop" class="level-up-pop">
   <div class="level-up-card">
