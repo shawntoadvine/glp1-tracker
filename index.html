@@ -479,44 +479,92 @@ function clearForm(){
 }
 
 
-function midpoint(a, b) { return Math.round((Number(a) + Number(b)) / 2); }
-function parseRangeOrSingle(text, label) {
-  const range = new RegExp(label + String.raw`\\s*[:\\-]?\\s*~?\\s*(\\d+(?:\\.\\d+)?)\\s*[–-]\\s*(\\d+(?:\\.\\d+)?)`, 'i');
-  const single = new RegExp(label + String.raw`\\s*[:\\-]?\\s*~?\\s*(\\d+(?:\\.\\d+)?)`, 'i');
-  let m = text.match(range);
-  if (m) return midpoint(m[1], m[2]);
-  m = text.match(single);
-  return m ? Math.round(Number(m[1])) : null;
+
+function midpoint(a, b) {
+  return Math.round((Number(a) + Number(b)) / 2);
 }
+
+function parseNumberRange(text, labelPattern) {
+  const range = new RegExp(
+    labelPattern + String.raw`\s*[:\-]?\s*~?\s*(\d+(?:\.\d+)?)\s*[–—-]\s*(\d+(?:\.\d+)?)`,
+    'i'
+  );
+  const single = new RegExp(
+    labelPattern + String.raw`\s*[:\-]?\s*~?\s*(\d+(?:\.\d+)?)`,
+    'i'
+  );
+
+  let match = text.match(range);
+  if (match) return midpoint(match[1], match[2]);
+
+  match = text.match(single);
+  if (match) return Math.round(Number(match[1]));
+
+  return null;
+}
+
 function pullNutritionFromSummary(meal) {
   const analysis = document.getElementById(`${meal}_airesult`);
-  const text = analysis ? analysis.value.trim() : '';
-  if (!text) { alert('Paste the Tracker Summary first.'); return; }
+  const text = analysis ? analysis.value.replace(/\u00A0/g, ' ').trim() : '';
+
+  if (!text) {
+    alert('Paste the Tracker Summary first.');
+    return;
+  }
+
   let calories = null;
-  let m = text.match(/most likely\\s*~?\\s*(\\d+(?:\\.\\d+)?)/i);
-  if (m) calories = Math.round(Number(m[1]));
-  if (calories === null) {
-    m = text.match(/(?:estimated\\s*)?(\\d+(?:\\.\\d+)?)\\s*[–-]\\s*(\\d+(?:\\.\\d+)?)\\s*(?:kcal|calories?)/i);
-    if (m) calories = midpoint(m[1], m[2]);
+  let match = null;
+
+  const preferredPatterns = [
+    /\b(?:best estimate|most likely|likely estimate|estimated total)\s*[:\-]?\s*~?\s*(\d+(?:\.\d+)?)\s*(?:kcal|calories?)?/i,
+    /\(\s*(?:best estimate|most likely|likely estimate)\s*~?\s*(\d+(?:\.\d+)?)\s*(?:kcal|calories?)?\s*\)/i,
+    /\b(?:best estimate|most likely|likely estimate)\b[^0-9]{0,15}~?\s*(\d+(?:\.\d+)?)/i
+  ];
+
+  for (const pattern of preferredPatterns) {
+    match = text.match(pattern);
+    if (match) {
+      calories = Math.round(Number(match[1]));
+      break;
+    }
   }
+
   if (calories === null) {
-    m = text.match(/~?\\s*(\\d+(?:\\.\\d+)?)\\s*(?:kcal|calories?)/i);
-    if (m) calories = Math.round(Number(m[1]));
+    match = text.match(/(?:estimated\s*)?(\d+(?:\.\d+)?)\s*[–—-]\s*(\d+(?:\.\d+)?)\s*(?:kcal|calories?)/i);
+    if (match) calories = midpoint(match[1], match[2]);
   }
+
+  if (calories === null) {
+    match = text.match(/(?:calories?|kcal)\s*[:\-]?\s*~?\s*(\d+(?:\.\d+)?)/i)
+      || text.match(/~?\s*(\d+(?:\.\d+)?)\s*(?:kcal|calories?)/i);
+    if (match) calories = Math.round(Number(match[1]));
+  }
+
   const values = {
     calories,
-    protein: parseRangeOrSingle(text, 'Protein'),
-    carbs: parseRangeOrSingle(text, 'Carbs'),
-    fat: parseRangeOrSingle(text, 'Fat')
+    protein: parseNumberRange(text, String.raw`\bprotein\b`),
+    carbs: parseNumberRange(text, String.raw`\b(?:carbs?|carbohydrates?)\b`),
+    fat: parseNumberRange(text, String.raw`\bfat\b`)
   };
-  const ids = {calories:`${meal}_calories`, protein:`${meal}_protein`, carbs:`${meal}_carbs`, fat:`${meal}_fat`};
-  let filled=0;
-  Object.entries(values).forEach(([k,v])=>{
-    if (v !== null && !Number.isNaN(v)) {
-      const el=document.getElementById(ids[k]);
-      if (el) { el.value=v; el.dispatchEvent(new Event('input',{bubbles:true})); filled++; }
+
+  const ids = {
+    calories: `${meal}_calories`,
+    protein: `${meal}_protein`,
+    carbs: `${meal}_carbs`,
+    fat: `${meal}_fat`
+  };
+
+  let filled = 0;
+  Object.entries(values).forEach(([key, value]) => {
+    const el = document.getElementById(ids[key]);
+    if (el && value !== null && !Number.isNaN(value)) {
+      el.value = value;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      filled++;
     }
   });
+
   if (filled) {
     if (typeof autosave === 'function') autosave();
     alert('Nutrition numbers added from the summary.');
