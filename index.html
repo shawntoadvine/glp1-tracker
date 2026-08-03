@@ -143,6 +143,16 @@
         </div>
         <div><label for="weight">Weight</label><input id="weight" type="number" step="0.1" placeholder="lbs"></div>
         <div><label for="sleep">Sleep</label><input id="sleep" type="number" step="0.1" placeholder="hours"></div>
+<div>
+  <label>Tracker Sleep Score</label>
+  <div class="card" style="margin:0;padding:12px">
+    <div id="sleepScoreValue" style="font-size:2rem;font-weight:800">—</div>
+    <div id="sleepScoreLabel" class="tiny">Waiting for Apple Health sleep data</div>
+  </div>
+  <input id="sleepAwakeMinutes" type="hidden">
+  <input id="sleepBedtime" type="hidden">
+  <input id="sleepScore" type="hidden">
+</div>
         <div>
   <label>Water</label>
   <div class="counter">
@@ -438,7 +448,7 @@ function checkedSymptoms(){return [...document.querySelectorAll('#symptomChips i
 function collect(){
   const e={
     date:val('entryDate'), entryDate:val('entryDate'), dose:val('dose'), injectionTime:val('injectionTime'),
-    injectionSite:val('injectionSite'), weight:val('weight'), sleep:val('sleep'), water:val('water'),
+    injectionSite:val('injectionSite'), weight:val('weight'), sleep:val('sleep'), sleepAwakeMinutes:val('sleepAwakeMinutes'), sleepBedtime:val('sleepBedtime'), sleepScore:val('sleepScore'), water:val('water'),
     hunger:val('hunger'), energy:val('energy'), generalNotes:val('generalNotes'),
     symptomNotes:val('symptomNotes'), symptoms:checkedSymptoms(),
     exerciseType:val('exerciseType'), exerciseMinutes:val('exerciseMinutes'), steps:val('steps'), activeCalories:val('activeCalories'), averageHeartRate:val('averageHeartRate'),
@@ -454,7 +464,7 @@ function collect(){
 }
 function setVal(id,v){document.getElementById(id).value=v||''}
 function populate(e){
-  ['entryDate','dose','injectionTime','injectionSite','weight','sleep','water','hunger','energy','generalNotes','symptomNotes','exerciseType','exerciseMinutes','steps','activeCalories','averageHeartRate','activityNotes'].forEach(id=>setVal(id,e[id]));
+  ['entryDate','dose','injectionTime','injectionSite','weight','sleep','sleepAwakeMinutes','sleepBedtime','sleepScore','water','hunger','energy','generalNotes','symptomNotes','exerciseType','exerciseMinutes','steps','activeCalories','averageHeartRate','activityNotes'].forEach(id=>setVal(id,e[id]));
   const s=new Set(e.symptoms||[]);document.querySelectorAll('#symptomChips input').forEach(x=>x.checked=s.has(x.value));
   mealNames.forEach(m=>{
     const d=e.meals?.[m]||{};
@@ -467,6 +477,7 @@ function populate(e){
   currentLoadedDate=e.date;
   updateTopDate();
   syncQuickChoices();
+  updateSleepScore();
   updateCompletion();
 }
 function clearForm(){
@@ -1086,6 +1097,76 @@ window.showHealthImportHelp=function(){
   document.getElementById('healthHelpOverlay').classList.add('show');
 }
 
+
+function clampSleepScore(n,min,max){return Math.max(min,Math.min(max,n));}
+function bedtimeMinutes(value){
+  const m=String(value||'').match(/(\d{1,2}):(\d{2})/);
+  return m ? ((Number(m[1])*60+Number(m[2]))%1440) : null;
+}
+function bedtimeDifference(a,b){
+  const d=Math.abs(a-b);
+  return Math.min(d,1440-d);
+}
+function previousBedtimes(){
+  try{
+    const values=[];
+    for(let i=0;i<localStorage.length;i++){
+      const raw=localStorage.getItem(localStorage.key(i));
+      if(!raw||raw[0]!=='{')continue;
+      const data=JSON.parse(raw);
+      const mins=bedtimeMinutes(data.sleepBedtime);
+      if(mins!==null)values.push(mins);
+    }
+    return values.slice(-14);
+  }catch(e){return [];}
+}
+function updateSleepScore(){
+  const hours=Number(document.getElementById('sleep')?.value);
+  const awake=Number(document.getElementById('sleepAwakeMinutes')?.value);
+  const bedtime=document.getElementById('sleepBedtime')?.value||'';
+  const scoreBox=document.getElementById('sleepScoreValue');
+  const label=document.getElementById('sleepScoreLabel');
+  const hidden=document.getElementById('sleepScore');
+  if(!scoreBox||!label||!Number.isFinite(hours)||hours<=0){
+    if(scoreBox)scoreBox.textContent='—';
+    if(label)label.textContent='Waiting for Apple Health sleep data';
+    if(hidden)hidden.value='';
+    return;
+  }
+
+  let duration=0;
+  if(hours<4) duration=10;
+  else if(hours<7.5) duration=10+((hours-4)/3.5)*40;
+  else if(hours<=9) duration=50;
+  else if(hours<=11) duration=50-((hours-9)/2)*15;
+  else duration=35;
+
+  let awakePts=20;
+  if(Number.isFinite(awake)&&awake>=0){
+    if(awake<=20) awakePts=20;
+    else if(awake<=60) awakePts=20-((awake-20)/40)*10;
+    else if(awake<=120) awakePts=10-((awake-60)/60)*10;
+    else awakePts=0;
+  }
+
+  let consistency=20;
+  const now=bedtimeMinutes(bedtime);
+  const history=previousBedtimes();
+  if(now!==null&&history.length){
+    const avg=history.reduce((sum,x)=>sum+bedtimeDifference(now,x),0)/history.length;
+    if(avg<=30) consistency=30;
+    else if(avg<=60) consistency=25;
+    else if(avg<=90) consistency=20;
+    else if(avg<=120) consistency=15;
+    else consistency=8;
+  }
+
+  const score=Math.round(clampSleepScore(duration+awakePts+consistency,0,100));
+  const quality=score>=90?'Excellent':score>=80?'Very good':score>=70?'Good':score>=60?'Fair':'Needs attention';
+  scoreBox.textContent=score;
+  label.textContent=`${quality} • ${hours.toFixed(1)} hours${Number.isFinite(awake)?` • ${Math.round(awake)} awake min`:''}${bedtime?` • bedtime ${bedtime}`:''}`;
+  if(hidden)hidden.value=score;
+}
 function importHealthFromURL(){
   const p=new URLSearchParams(window.location.search);
   if(p.get('healthImport')!=='1')return false;
@@ -1121,6 +1202,18 @@ function importHealthFromURL(){
     }
   });
 
+  const sleepAwake=p.get('sleepAwake');
+  const sleepBedtime=p.get('sleepBedtime');
+  if(sleepAwake!==null&&sleepAwake!==''){
+    document.getElementById('sleepAwakeMinutes').value=Math.round(parseFloat(sleepAwake)||0);
+    imported.push('sleepAwakeMinutes');
+  }
+  if(sleepBedtime){
+    document.getElementById('sleepBedtime').value=sleepBedtime;
+    imported.push('sleepBedtime');
+  }
+  updateSleepScore();
+
   if(p.get('exerciseType')){
     document.getElementById('exerciseType').value=p.get('exerciseType');
   }else if(p.get('exercise')){
@@ -1143,6 +1236,9 @@ function importHealthFromURL(){
   return imported.length>0;
 }
 
+document.addEventListener('input',e=>{
+  if(['sleep','sleepAwakeMinutes','sleepBedtime'].includes(e.target?.id)) updateSleepScore();
+});
 async function init(){
   buildMeals();bindQuickChoices();await openDB();document.getElementById('entryDate').value=todayISO();updateTopDate();
   document.getElementById('entryDate').addEventListener('change',e=>loadDate(e.target.value));
