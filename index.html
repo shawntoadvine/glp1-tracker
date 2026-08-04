@@ -581,7 +581,7 @@ main,.screen{background:transparent!important}
       <div class="game-stat"><div style="font-size:1.6rem">👟</div><strong id="overviewSteps">0</strong><span>Steps</span></div>
       <div class="game-stat"><div style="font-size:1.6rem">🔥</div><strong id="overviewActiveCalories">0</strong><span>Active Calories</span></div>
       <div class="game-stat"><div style="font-size:1.6rem">❤️</div><strong id="overviewHeartRate">—</strong><span>Heart Rate</span></div>
-      <div class="game-stat"><button class="btn primary" onclick="runHealthShortcut()">Run Health Shortcut</button><button class="btn success" style="margin-top:6px" onclick="pasteHealthImport()">Finish Import</button></div>
+      <div class="game-stat"><button class="btn primary" onclick="runHealthShortcut()">Run Health Shortcut</button></div>
     </div>
   </div>
 
@@ -803,9 +803,19 @@ Injection and dose fields are hidden because this is not your scheduled dose day
       <div class="actions">
         <button class="btn primary" onclick="saveCurrentDay()">Save Activity</button>
         <button class="btn secondary" onclick="runHealthShortcut()">1. Run Health Shortcut</button>
-        <button class="btn success" onclick="pasteHealthImport()">2. Finish Health Import</button>
         <button class="btn secondary" onclick="showHealthImportHelp()">Shortcut Help</button>
       </div>
+
+      <div class="ai-box" style="margin-top:14px;">
+        <h4 style="margin-top:0;">2. Paste Health Import</h4>
+        <div class="tiny">Tap inside the box, choose Paste, then tap Import & Save.</div>
+        <textarea id="healthImportPasteBox" placeholder="Paste the copied Shortcut result here"></textarea>
+        <div class="actions">
+          <button class="btn success" onclick="importPastedHealthData()">Import & Save</button>
+          <button class="btn secondary" onclick="clearHealthImportBox()">Clear</button>
+        </div>
+      </div>
+
       <div class="autosave-status" id="healthImportStatus"></div>
     </div>
   </section>
@@ -854,10 +864,10 @@ Injection and dose fields are hidden because this is not your scheduled dose day
   <div class="setup-card">
     <h2>Import Apple Health</h2>
     <div class="muted">
-      Run the <strong>GLP-1 Health Import</strong> Shortcut. The Shortcut should copy its final Text result to the clipboard instead of opening the web address.
+      Run the <strong>GLP-1 Health Import</strong> Shortcut. Its final action should be <strong>Copy Text to Clipboard</strong>.
     </div>
     <div class="section-note" style="margin-top:12px">
-      Return to this Home Screen tracker and tap <strong>Finish Health Import</strong>. This keeps the imported data in the same installed app storage so it remains after closing.
+      Return to this Home Screen tracker, tap inside the Paste Health Import box, choose <strong>Paste</strong>, then tap <strong>Import & Save</strong>.
     </div>
     <div class="actions"><button class="btn secondary" onclick="document.getElementById('healthHelpOverlay').classList.remove('show')">Close</button></div>
   </div>
@@ -2273,6 +2283,41 @@ async function applyHealthImportValues(data){
   }
 
   return imported;
+}
+
+
+window.importPastedHealthData=async function(){
+  const box=document.getElementById('healthImportPasteBox');
+  const status=document.getElementById('healthImportStatus');
+  const raw=box?.value?.trim()||'';
+
+  if(!raw){
+    if(status)status.textContent='Paste the Shortcut result into the box first.';
+    alert('Tap inside the box, choose Paste, then tap Import & Save.');
+    return;
+  }
+
+  const parsed=parseHealthImportText(raw);
+  if(!parsed){
+    if(status)status.textContent='The pasted text did not contain usable Health data.';
+    alert('The pasted text was not recognized. Run the Shortcut again and copy its final Text result.');
+    return;
+  }
+
+  const count=await applyHealthImportValues(parsed);
+  if(count){
+    if(status)status.textContent='✓ Apple Health data imported and saved';
+    if(box)box.value='';
+  }else{
+    if(status)status.textContent='No usable Health values were found.';
+  }
+}
+
+window.clearHealthImportBox=function(){
+  const box=document.getElementById('healthImportPasteBox');
+  if(box)box.value='';
+  const status=document.getElementById('healthImportStatus');
+  if(status)status.textContent='';
 }
 
 window.pasteHealthImport=async function(){
