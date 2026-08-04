@@ -1036,7 +1036,7 @@ function mealCardHTML(meal){
             <div><label>Fat (g)</label><input id="${meal}_fat" type="number"></div>
           </div>
           <div style="margin-top:10px"><label>Paste ChatGPT analysis</label><textarea id="${meal}_airesult"></textarea>
-            <button type="button" class="btn secondary" onclick="pullNutritionFromSummary('${meal}')">Pull Numbers from Summary</button>
+            <button type="button" class="btn secondary" onclick="pullNutritionFromSummary(\'${meal}\')">Pull Numbers from Summary</button>
             <div class="tiny">Uses the most-likely estimate when available; otherwise uses the midpoint of a range.</div>
           </div>
         </div>
@@ -1418,194 +1418,169 @@ function clearForm(){
 
 
 
-function midpoint(a, b) {
-  return Math.round((Number(a) + Number(b)) / 2);
+
+function midpoint(a,b){
+  const x=Number(a), y=Number(b);
+  if(!Number.isFinite(x)||!Number.isFinite(y)) return null;
+  return Math.round((x+y)/2);
 }
 
-function parseNumberRange(text,labelPattern){
-  const afterRange=new RegExp(
-    labelPattern + String.raw`\s*[:\-]?\s*~?\s*(\d+(?:\.\d+)?)\s*[–—-]\s*(\d+(?:\.\d+)?)`,
-    'i'
-  );
-  const afterSingle=new RegExp(
-    labelPattern + String.raw`\s*[:\-]?\s*~?\s*(\d+(?:\.\d+)?)`,
-    'i'
-  );
-  const beforeRange=new RegExp(
-    String.raw`~?\s*(\d+(?:\.\d+)?)\s*[–—-]\s*(\d+(?:\.\d+)?)\s*(?:g|grams?)?\s*` + labelPattern,
-    'i'
-  );
-  const beforeSingle=new RegExp(
-    String.raw`~?\s*(\d+(?:\.\d+)?)\s*(?:g|grams?)?\s*` + labelPattern,
-    'i'
-  );
+function normalizeSummaryText(text){
+  return String(text||'')
+    .replace(/\u00a0/g,' ')
+    .replace(/[•·|]/g,', ')
+    .replace(/[–—]/g,'-')
+    .replace(/\s+/g,' ')
+    .trim();
+}
 
-  let match=text.match(afterRange);
-  if(match)return midpoint(match[1],match[2]);
+function extractLabeledNumber(text,labelPattern){
+  const source=normalizeSummaryText(text);
+  const unit=String.raw`(?:\s*(?:g|grams?|kcal|calories?))?`;
 
-  match=text.match(beforeRange);
-  if(match)return midpoint(match[1],match[2]);
+  const patterns=[
+    new RegExp(labelPattern+String.raw`\s*[:\-]?\s*~?\s*(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)`+unit,'i'),
+    new RegExp(String.raw`~?\s*(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)`+unit+String.raw`\s*`+labelPattern,'i'),
+    new RegExp(labelPattern+String.raw`\s*[:\-]?\s*~?\s*(\d+(?:\.\d+)?)`+unit,'i'),
+    new RegExp(String.raw`~?\s*(\d+(?:\.\d+)?)`+unit+String.raw`\s*`+labelPattern,'i')
+  ];
 
-  match=text.match(afterSingle);
-  if(match)return Math.round(Number(match[1]));
+  let match=source.match(patterns[0]);
+  if(match) return midpoint(match[1],match[2]);
 
-  match=text.match(beforeSingle);
-  if(match)return Math.round(Number(match[1]));
+  match=source.match(patterns[1]);
+  if(match) return midpoint(match[1],match[2]);
+
+  match=source.match(patterns[2]);
+  if(match) return Math.round(Number(match[1]));
+
+  match=source.match(patterns[3]);
+  if(match) return Math.round(Number(match[1]));
 
   return null;
 }
 
-function cleanMealDescription(text) {
-  let description = text
-    .replace(/^tracker summary\s*/i, '')
-    .replace(/^(breakfast|lunch|dinner|snacks?\s*\/?\s*drinks?)\s*:\s*/i, '')
-    .trim();
+function extractCalories(text){
+  const source=normalizeSummaryText(text);
+  const preferred=[
+    /\b(?:best estimate|most likely|likely estimate|estimated total|estimated calories?)\s*[:\-]?\s*~?\s*(\d+(?:\.\d+)?)/i,
+    /\bcalories?\s*[:\-]?\s*~?\s*(\d+(?:\.\d+)?)/i,
+    /~?\s*(\d+(?:\.\d+)?)\s*(?:kcal|calories?)/i
+  ];
 
-  const stopPatterns = [
-    /\bestimated\b/i,
-    /\bcalories?\b/i,
-    /\bkcal\b/i,
+  for(const pattern of preferred){
+    const match=source.match(pattern);
+    if(match) return Math.round(Number(match[1]));
+  }
+
+  const range=source.match(/(?:range\s*)?\(?\s*(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*\)?\s*(?:kcal|calories?)?/i);
+  if(range) return midpoint(range[1],range[2]);
+
+  return null;
+}
+
+function extractMealDescription(text){
+  let source=normalizeSummaryText(text)
+    .replace(/^tracker summary\s*/i,'')
+    .replace(/^(breakfast|lunch|dinner|snacks?\s*\/?\s*drinks?)\s*:\s*/i,'');
+
+  const stops=[
+    /\bestimated calories?\b/i,
+    /\bestimated macros?\b/i,
+    /\bconfidence\b/i,
     /\bprotein\b/i
   ];
 
-  let cut = description.length;
-  stopPatterns.forEach(pattern => {
-    const match = description.search(pattern);
-    if (match >= 0 && match < cut) cut = match;
-  });
-
-  description = description.slice(0, cut)
-    .replace(/[.;,\s]+$/, '')
-    .trim();
-
-  return description;
-}
-
-function extractApproximateAmounts(description) {
-  const amountPattern = /(?:~?\s*\d+(?:\.\d+)?(?:\s*[–—-]\s*\d+(?:\.\d+)?)?\s*(?:oz|ounces?|cups?|tbsp|tablespoons?|tsp|teaspoons?|pieces?|slices?|medium|small|large|¼|⅓|½|¾))|(?:[¼⅓½¾]\s*(?:cup|cups|tbsp|tablespoons?|tsp|teaspoons?))/gi;
-  const matches = description.match(amountPattern) || [];
-  return [...new Set(matches.map(v => v.replace(/\s+/g, ' ').trim()))].join('; ');
-}
-
-function extractPortionSummary(description) {
-  const parts = description.split(/,\s+(?=[a-z])/i)
-    .map(part => part.trim())
-    .filter(Boolean);
-
-  const withAmounts = parts.filter(part =>
-    /(?:\d|¼|⅓|½|¾|small|medium|large|cup|oz|tbsp|tsp|piece|slice)/i.test(part)
-  );
-
-  return withAmounts.slice(0, 4).join('; ');
-}
-
-function setFirstAvailableField(meal, suffixes, value) {
-  if (!value) return false;
-
-  for (const suffix of suffixes) {
-    const el = document.getElementById(`${meal}_${suffix}`);
-    if (el) {
-      el.value = value;
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-      el.dispatchEvent(new Event('change', { bubbles: true }));
-      return true;
-    }
+  let cut=source.length;
+  for(const pattern of stops){
+    const index=source.search(pattern);
+    if(index>=0 && index<cut) cut=index;
   }
 
-  return false;
+  return source.slice(0,cut).replace(/[.;,\s]+$/,'').trim();
 }
 
-function pullNutritionFromSummary(meal) {
-  const analysis = document.getElementById(`${meal}_airesult`);
-  const text = analysis ? analysis.value.replace(/\u00A0/g, ' ').trim() : '';
+function extractApproximateAmount(description){
+  const matches=String(description||'').match(
+    /(?:~?\s*\d+(?:\.\d+)?(?:\s*-\s*\d+(?:\.\d+)?)?\s*(?:oz|ounces?|cups?|tbsp|tablespoons?|tsp|teaspoons?|pieces?|slices?))|(?:[¼⅓½¾]\s*-\s*[¼⅓½¾]\s*(?:cup|cups|tbsp|tablespoons?|tsp|teaspoons?))|(?:[¼⅓½¾]\s*(?:cup|cups|tbsp|tablespoons?|tsp|teaspoons?))/gi
+  )||[];
 
-  if (!text) {
+  return [...new Set(matches.map(v=>v.replace(/\s+/g,' ').trim()))].join('; ');
+}
+
+function determinePortion(calories,text){
+  const explicit=String(text||'').match(/\b(very large|small|medium|large)\s+(?:portion|meal)\b/i);
+  if(explicit) return explicit[1].toLowerCase().replace(/^./,c=>c.toUpperCase());
+
+  if(!Number.isFinite(calories)) return '';
+  if(calories<350) return 'Small';
+  if(calories<=700) return 'Medium';
+  if(calories<=1000) return 'Large';
+  return 'Very large';
+}
+
+function setMealField(meal,suffix,value){
+  if(value===null || value===undefined || value==='') return false;
+  const el=document.getElementById(`${meal}_${suffix}`);
+  if(!el) return false;
+  el.value=value;
+  el.dispatchEvent(new Event('input',{bubbles:true}));
+  el.dispatchEvent(new Event('change',{bubbles:true}));
+  return true;
+}
+
+window.pullNutritionFromSummary=function(meal){
+  const analysis=document.getElementById(`${meal}_airesult`);
+  const text=analysis?.value?.trim()||'';
+
+  if(!text){
     alert('Paste the Tracker Summary first.');
     return;
   }
 
-  let calories = null;
-  let match = null;
+  const calories=extractCalories(text);
+  const protein=extractLabeledNumber(text,String.raw`\bprotein\b`);
+  const carbs=extractLabeledNumber(text,String.raw`\b(?:carbs?|carbohydrates?)\b`);
+  const fat=extractLabeledNumber(text,String.raw`\bfat\b`);
+  const description=extractMealDescription(text);
+  const amount=extractApproximateAmount(description);
+  const portion=determinePortion(calories,text);
 
-  const preferredPatterns = [
-    /\b(?:best estimate|most likely|likely estimate|estimated total)\s*[:\-]?\s*~?\s*(\d+(?:\.\d+)?)\s*(?:kcal|calories?)?/i,
-    /\(\s*(?:best estimate|most likely|likely estimate)\s*~?\s*(\d+(?:\.\d+)?)\s*(?:kcal|calories?)?\s*\)/i,
-    /\b(?:best estimate|most likely|likely estimate)\b[^0-9]{0,15}~?\s*(\d+(?:\.\d+)?)/i
-  ];
+  let filled=0;
+  if(setMealField(meal,'calories',calories)) filled++;
+  if(setMealField(meal,'protein',protein)) filled++;
+  if(setMealField(meal,'carbs',carbs)) filled++;
+  if(setMealField(meal,'fat',fat)) filled++;
+  if(setMealField(meal,'desc',description)) filled++;
+  if(setMealField(meal,'portion',portion)) filled++;
+  if(setMealField(meal,'amount',amount)) filled++;
 
-  for (const pattern of preferredPatterns) {
-    match = text.match(pattern);
-    if (match) {
-      calories = Math.round(Number(match[1]));
-      break;
-    }
+  const editor=document.getElementById(`${meal}_editor`);
+  if(editor) editor.classList.add('open');
+
+  const openButton=document.querySelector(`[onclick*="toggleMeal('${meal}'"]`);
+  if(openButton) openButton.textContent='Close';
+
+  updateMealSummary(meal);
+  updateCompletion();
+  renderGameLayer?.();
+
+  // Save immediately without closing the meal section.
+  if(typeof autosaveNow==='function'){
+    Promise.resolve(autosaveNow()).catch(()=>{});
+  }else if(typeof scheduleAutosave==='function'){
+    scheduleAutosave();
   }
 
-  if (calories === null) {
-    match = text.match(/(?:estimated\s*)?(\d+(?:\.\d+)?)\s*[–—-]\s*(\d+(?:\.\d+)?)\s*(?:kcal|calories?)/i);
-    if (match) calories = midpoint(match[1], match[2]);
+  const status=document.getElementById(`${meal}_status`);
+  if(status){
+    status.textContent=filled
+      ? '✓ Meal details and nutrition added and saved'
+      : 'No meal details or nutrition were found';
   }
 
-  if (calories === null) {
-    match = text.match(/(?:calories?|kcal)\s*[:\-]?\s*~?\s*(\d+(?:\.\d+)?)/i)
-      || text.match(/~?\s*(\d+(?:\.\d+)?)\s*(?:kcal|calories?)/i);
-    if (match) calories = Math.round(Number(match[1]));
-  }
-
-  const nutritionValues = {
-    calories,
-    protein: parseNumberRange(text, String.raw`\bprotein\b`),
-    carbs: parseNumberRange(text, String.raw`\b(?:carbs?|carbohydrates?)\b`),
-    fat: parseNumberRange(text, String.raw`\bfat\b`)
-  };
-
-  const ids = {
-    calories: `${meal}_calories`,
-    protein: `${meal}_protein`,
-    carbs: `${meal}_carbs`,
-    fat: `${meal}_fat`
-  };
-
-  let filled = 0;
-
-  Object.entries(nutritionValues).forEach(([key, value]) => {
-    const el = document.getElementById(ids[key]);
-    if (el && value !== null && !Number.isNaN(value)) {
-      el.value = value;
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-      el.dispatchEvent(new Event('change', { bubbles: true }));
-      filled++;
-    }
-  });
-
-  const description = cleanMealDescription(text);
-  const detailedPortion = extractPortionSummary(description);
-  const approximateAmount = extractApproximateAmounts(description);
-
-  // The Portion field is a dropdown, so choose one of its valid values.
-  let portionSize = '';
-  const explicitPortion = text.match(/\b(very large|small|medium|large)\s+(?:portion|meal)\b/i);
-
-  if (explicitPortion) {
-    portionSize = explicitPortion[1]
-      .toLowerCase()
-      .replace(/^./, ch => ch.toUpperCase());
-  } else if (calories !== null) {
-    if (calories < 350) portionSize = 'Small';
-    else if (calories <= 700) portionSize = 'Medium';
-    else if (calories <= 1000) portionSize = 'Large';
-    else portionSize = 'Very large';
-  }
-
-  if (setFirstAvailableField(meal, ['desc', 'what', 'food', 'description', 'ate'], description)) filled++;
-  if (setFirstAvailableField(meal, ['portion'], portionSize)) filled++;
-  if (setFirstAvailableField(meal, ['amount', 'approx', 'approximate'], approximateAmount || detailedPortion)) filled++;
-
-  if (filled) {
-    if (typeof autosave === 'function') autosave();
-    alert('Meal details and nutrition were added from the summary.');
-  } else {
-    alert('No meal details or nutrition were found in that summary.');
+  if(!filled){
+    alert('No calories or macros were found in that summary.');
   }
 }
 
