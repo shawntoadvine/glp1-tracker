@@ -959,16 +959,11 @@ function localDayKey(date){
 }
 
 function saveLocalDayBackup(entry){
-  if(!entry?.date) return;
   try{
-    const safe=JSON.parse(JSON.stringify(entry));
-    if(safe.meals){
-      Object.values(safe.meals).forEach(meal=>{
-        if(meal) meal.photo='';
-      });
-    }
-    localStorage.setItem(localDayKey(entry.date),JSON.stringify(safe));
-    localStorage.setItem('glp1LastSavedDateV17',entry.date);
+    if(!entry || !entry.date) return;
+    const safeEntry={...entry,date:String(entry.date)};
+    localStorage.setItem(localDayKey(safeEntry.date),JSON.stringify(safeEntry));
+    localStorage.setItem('glp1LatestBackup',JSON.stringify(safeEntry));
   }catch(error){
     console.warn('Local day backup failed',error);
   }
@@ -1660,16 +1655,23 @@ function finishAppRestore(){
 }
 
 async function restoreVisibleDay(force=false){
-  const uiDate=document.getElementById('entryDate')?.value||todayISO();
-  if(currentLoadedDate && currentLoadedDate!==uiDate) appDataLoaded=false;
-  if(restoreInProgress)return;
+  if(restoreInProgress) return;
   const selectedDate=document.getElementById('entryDate')?.value||todayISO();
+
   if(!force && appDataLoaded && lastSuccessfulRestore===selectedDate){
-    updateCompletion();renderGameLayer();return;
+    updateCompletion();
+    renderGameLayer();
+    return;
   }
+
   restoreInProgress=true;
-  try{await loadDate(selectedDate);lastSuccessfulRestore=selectedDate;}
-  finally{restoreInProgress=false;}
+  document.body.classList.add('app-restoring');
+  try{
+    await loadDate(selectedDate);
+    lastSuccessfulRestore=selectedDate;
+  }finally{
+    restoreInProgress=false;
+  }
 }
 
 
@@ -1722,18 +1724,31 @@ function resetBlankDayForDate(date){
 
 async function loadDate(date){
   appDataLoaded=false;
+  const requestedDate=String(date||todayISO());
   let entry=null;
-  try{entry=await getEntry(date);}catch(error){console.warn('IndexedDB load failed',error);}
+
+  try{entry=await getEntry(requestedDate);}catch(error){console.warn('IndexedDB load failed',error);}
+  if(!entry) entry=getLocalDayBackup(requestedDate);
+
   if(!entry){
-    entry=getLocalDayBackup(date);
-    if(entry){try{await putEntry(entry);}catch(error){}}
+    try{
+      const raw=localStorage.getItem('glp1LatestBackup');
+      const latest=raw?JSON.parse(raw):null;
+      if(latest && latest.date===requestedDate) entry=latest;
+    }catch(error){}
   }
-  if(entry){
+
+  if(entry && entry.date===requestedDate){
     populate(entry);
+    try{await putEntry(entry);}catch(error){}
+    try{saveLocalDayBackup(entry);}catch(error){}
   }else{
-    resetBlankDayForDate(date);
+    resetBlankDayForDate(requestedDate);
   }
-  currentLoadedDate=date;
+
+  const dateField=document.getElementById('entryDate');
+  if(dateField) dateField.value=requestedDate;
+  currentLoadedDate=requestedDate;
   finishAppRestore();
 }
 function clearFormNoConfirm(){
@@ -1893,29 +1908,25 @@ function scheduleAutosave(){
   autosaveTimer=setTimeout(()=>autosaveNow(),700);
 }
 async function autosaveNow(){
-  if(!appDataLoaded) return;
+  if(!appDataLoaded) return false;
 
-  const e=collect();
-  if(!e.date)return;
+  const entry=collect();
+  const visibleDate=document.getElementById('entryDate')?.value||todayISO();
+  entry.date=visibleDate;
 
-  currentMealNames().forEach(m=>{
-    if(e.meals[m]) e.meals[m].photo='';
-  });
+  saveLocalDayBackup(entry);
+  try{await putEntry(entry);}catch(error){console.warn('IndexedDB save failed',error);}
 
-  saveLocalDayBackup(e);
+  currentLoadedDate=visibleDate;
+  lastSuccessfulRestore=visibleDate;
 
-  try{
-    await putEntry(e);
-  }catch(error){
-    console.warn('IndexedDB save failed; local backup retained',error);
-  }
-
-  currentLoadedDate=e.date;
   const status=document.getElementById('autosaveStatus');
-  if(status)status.textContent='✓ Saved automatically';
-  updateCompletion();
-  updateStorageInfo();
-  awardTodayGameProgress();
+  if(status){
+    status.textContent='Saved';
+    clearTimeout(window.__autosaveStatusTimer);
+    window.__autosaveStatusTimer=setTimeout(()=>{if(status.textContent==='Saved')status.textContent='';},1400);
+  }
+  return true;
 }
 window.quickWater=function(){
   const el=document.getElementById('water');
@@ -2644,6 +2655,27 @@ document.addEventListener('visibilitychange',()=>{
 window.addEventListener('pageshow',event=>{if(event.persisted)restoreVisibleDay(true);});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(()=>restoreVisibleDay(true),50);});
 window.addEventListener('focus',()=>setTimeout(()=>restoreVisibleDay(true),50));
+
+
+let delegatedAutosaveTimer=null;
+function queueReliableAutosave(){
+  if(!appDataLoaded) return;
+  clearTimeout(delegatedAutosaveTimer);
+  delegatedAutosaveTimer=setTimeout(()=>autosaveNow(),250);
+}
+document.addEventListener('input',event=>{
+  if(event.target?.matches('input,select,textarea')) queueReliableAutosave();
+});
+document.addEventListener('change',event=>{
+  if(event.target?.matches('input,select,textarea')) queueReliableAutosave();
+});
+window.addEventListener('pagehide',()=>{
+  if(appDataLoaded){
+    const entry=collect();
+    entry.date=document.getElementById('entryDate')?.value||todayISO();
+    saveLocalDayBackup(entry);
+  }
+});
 
 async function init(){
   appDataLoaded=false;
