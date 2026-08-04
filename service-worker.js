@@ -1,4 +1,4 @@
-const CACHE='glp1-tracker-v18-0';
+const CACHE='glp1-tracker-v18-1-activity-save';
 const ASSETS=[
   './',
   './index.html',

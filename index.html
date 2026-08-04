@@ -832,9 +832,10 @@ Injection and dose fields are hidden because this is not your scheduled dose day
         <textarea id="activityNotes" placeholder="How it felt, intensity, distance, soreness, etc."></textarea>
       </div>
       <div class="actions">
-        <button class="btn primary" onclick="saveCurrentDay()">Save Activity</button>
+        <button class="btn primary" onclick="saveActivitySection()">Save Activity</button>
         <button class="btn secondary" onclick="runHealthShortcut()">Import from Apple Health</button><button class="btn secondary" onclick="showHealthImportHelp()">Shortcut Help</button>
       </div>
+      <div class="autosave-status" id="activitySaveStatus"></div>
       <div class="autosave-status" id="healthImportStatus"></div>
     </div>
   </section>
@@ -2019,22 +2020,82 @@ setInterval(checkDateRollover,60000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkDateRollover()});
 
 window.saveCurrentDay=async function(){
-  const e=collect();if(!e.date){alert('Choose a date first.');return}
-  currentMealNames().forEach(m=>{
-    e.meals[m].photo='';
-    const p=document.getElementById(m+'_preview');
-    p.src='';p.dataset.image='';p.style.display='none';
-    document.getElementById(m+'_photo').value='';
+  const entry=collect();
+  const visibleDate=document.getElementById('entryDate')?.value||todayISO();
+
+  if(!visibleDate){
+    alert('Choose a date first.');
+    return false;
+  }
+
+  entry.date=visibleDate;
+  entry.entryDate=visibleDate;
+
+  // Preserve every Activity field explicitly.
+  [
+    'exerciseType',
+    'exerciseMinutes',
+    'steps',
+    'activeCalories',
+    'averageHeartRate',
+    'activityNotes',
+    'sleep',
+    'sleepAwakeMinutes',
+    'sleepBedtime',
+    'sleepScore'
+  ].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) entry[id]=el.value;
   });
-  await putEntry(e);
-  currentLoadedDate=e.date;
-  currentMealNames().forEach(updateMealSummary);
-  showSaved();
-  renderHistory();
-  updateStorageInfo();
-  const status=document.getElementById('autosaveStatus');
-  if(status)status.textContent='✓ Saved automatically';
+
+  try{
+    // Save the exact same complete entry to every persistence layer.
+    localStorage.setItem(formSnapshotKey(visibleDate),JSON.stringify(entry));
+    localStorage.setItem('glp1-last-visible-date',visibleDate);
+    saveLocalDayBackup(entry);
+    await putEntry(entry);
+
+    currentLoadedDate=visibleDate;
+    lastSuccessfulRestore=visibleDate;
+    appDataLoaded=true;
+
+    currentMealNames().forEach(updateMealSummary);
+    updateSleepScore();
+    updateCompletion();
+    renderGameLayer();
+    renderHistory();
+    updateStorageInfo();
+    showSaved();
+
+    const status=document.getElementById('autosaveStatus');
+    if(status) status.textContent='✓ Saved';
+
+    setTimeout(()=>{
+      if(status?.textContent==='✓ Saved') status.textContent='';
+    },1600);
+
+    return true;
+  }catch(error){
+    console.error('Manual save failed',error);
+    alert('The tracker could not save. Please try again.');
+    return false;
+  }
 }
+
+window.saveActivitySection=async function(){
+  const saved=await saveCurrentDay();
+  if(saved){
+    const status=document.getElementById('activitySaveStatus');
+    if(status){
+      status.textContent='✓ Activity saved';
+      setTimeout(()=>{
+        if(status.textContent==='✓ Activity saved') status.textContent='';
+      },1800);
+    }
+  }
+  return saved;
+}
+
 function showSaved(){const b=document.getElementById('saveBanner');b.classList.add('show');setTimeout(()=>b.classList.remove('show'),1200)}
 
 function buildMealPrompt(meal){
@@ -2711,6 +2772,38 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 window.addEventListener('focus',()=>setTimeout(()=>restoreVisibleDay(true),50));
 
 
+
+const ACTIVITY_SAVE_IDS=new Set([
+  'exerciseType','exerciseMinutes','steps','activeCalories',
+  'averageHeartRate','activityNotes','sleep','sleepAwakeMinutes',
+  'sleepBedtime','sleepScore'
+]);
+
+function snapshotActivityFields(){
+  if(!appDataLoaded) return;
+  const date=document.getElementById('entryDate')?.value||todayISO();
+  const entry=collect();
+  entry.date=date;
+  entry.entryDate=date;
+  ACTIVITY_SAVE_IDS.forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) entry[id]=el.value;
+  });
+  try{
+    localStorage.setItem(formSnapshotKey(date),JSON.stringify(entry));
+    saveLocalDayBackup(entry);
+  }catch(error){
+    console.warn('Activity snapshot failed',error);
+  }
+}
+
+document.addEventListener('input',event=>{
+  if(ACTIVITY_SAVE_IDS.has(event.target?.id)) snapshotActivityFields();
+});
+document.addEventListener('change',event=>{
+  if(ACTIVITY_SAVE_IDS.has(event.target?.id)) snapshotActivityFields();
+});
+
 let delegatedAutosaveTimer=null;
 function queueReliableAutosave(){
   if(!appDataLoaded) return;
@@ -2812,6 +2905,6 @@ init();
   </div>
 </div>
 
-<div class="app-version-badge">v18.0</div>
+<div class="app-version-badge">v18.1</div>
 </body>
 </html>
