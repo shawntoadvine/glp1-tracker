@@ -489,9 +489,24 @@ main,.screen{background:transparent!important}
   .game-title{font-size:1.85rem}
 }
 
+
+.app-loading-mask{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#eaf4ff,#f7fbff);transition:opacity .2s ease}
+.app-loading-mask.hidden{opacity:0;pointer-events:none}
+.app-loading-card{width:min(330px,calc(100vw - 44px));padding:24px;text-align:center;border-radius:24px;border:3px solid #f6bd3e;background:linear-gradient(180deg,#fff,#fff7db);box-shadow:0 18px 60px rgba(7,26,56,.22)}
+.app-loading-avatar{width:92px;height:92px;border-radius:50%;object-fit:cover;border:4px solid #fff;box-shadow:0 0 0 4px #2e6cf6,0 0 0 8px #f6bd3e;margin-bottom:14px}
+.app-loading-title{margin:0;color:#10254f;font-size:1.45rem;font-weight:900}
+.app-loading-text{margin-top:7px;color:#5b6475;font-weight:700}
+body.app-restoring .screen,body.app-restoring .bottom-nav{visibility:hidden}
 </style>
 </head>
-<body>
+<body class="app-restoring">
+<div id="appLoadingMask" class="app-loading-mask">
+  <div class="app-loading-card">
+    <img src="avatar.png" alt="" class="app-loading-avatar">
+    <h2 class="app-loading-title">Loading today’s quest…</h2>
+    <div class="app-loading-text">Restoring your saved tracker data</div>
+  </div>
+</div>
 <div class="app">
   <div class="topbar">
     <div class="title-row">
@@ -581,7 +596,7 @@ main,.screen{background:transparent!important}
       <div class="game-stat"><div style="font-size:1.6rem">👟</div><strong id="overviewSteps">0</strong><span>Steps</span></div>
       <div class="game-stat"><div style="font-size:1.6rem">🔥</div><strong id="overviewActiveCalories">0</strong><span>Active Calories</span></div>
       <div class="game-stat"><div style="font-size:1.6rem">❤️</div><strong id="overviewHeartRate">—</strong><span>Heart Rate</span></div>
-      <div class="game-stat"><button class="btn primary" onclick="runHealthShortcut()">Run Health Shortcut</button></div>
+      <div class="game-stat"><button class="btn primary" onclick="runHealthShortcut()">Import Apple Health</button></div>
     </div>
   </div>
 
@@ -802,20 +817,8 @@ Injection and dose fields are hidden because this is not your scheduled dose day
       </div>
       <div class="actions">
         <button class="btn primary" onclick="saveCurrentDay()">Save Activity</button>
-        <button class="btn secondary" onclick="runHealthShortcut()">1. Run Health Shortcut</button>
-        <button class="btn secondary" onclick="showHealthImportHelp()">Shortcut Help</button>
+        <button class="btn secondary" onclick="runHealthShortcut()">Import from Apple Health</button><button class="btn secondary" onclick="showHealthImportHelp()">Shortcut Help</button>
       </div>
-
-      <div class="ai-box" style="margin-top:14px;">
-        <h4 style="margin-top:0;">2. Paste Health Import</h4>
-        <div class="tiny">Tap inside the box, choose Paste, then tap Import & Save.</div>
-        <textarea id="healthImportPasteBox" placeholder="Paste the copied Shortcut result here"></textarea>
-        <div class="actions">
-          <button class="btn success" onclick="importPastedHealthData()">Import & Save</button>
-          <button class="btn secondary" onclick="clearHealthImportBox()">Clear</button>
-        </div>
-      </div>
-
       <div class="autosave-status" id="healthImportStatus"></div>
     </div>
   </section>
@@ -863,12 +866,8 @@ Injection and dose fields are hidden because this is not your scheduled dose day
 <div class="setup-overlay" id="healthHelpOverlay">
   <div class="setup-card">
     <h2>Import Apple Health</h2>
-    <div class="muted">
-      Run the <strong>GLP-1 Health Import</strong> Shortcut. Its final action should be <strong>Copy Text to Clipboard</strong>.
-    </div>
-    <div class="section-note" style="margin-top:12px">
-      Return to this Home Screen tracker, tap inside the Paste Health Import box, choose <strong>Paste</strong>, then tap <strong>Import & Save</strong>.
-    </div>
+    <div class="muted">Run the <strong>GLP-1 Health Import</strong> Shortcut. It will read today’s Health data and reopen this tracker with sleep, steps, exercise minutes, and active calories filled in.</div>
+    <div class="section-note" style="margin-top:12px">After setup, this becomes a one-tap import. You can also ask Siri to run “GLP-1 Health Import.”</div>
     <div class="actions"><button class="btn secondary" onclick="document.getElementById('healthHelpOverlay').classList.remove('show')">Close</button></div>
   </div>
 </div>
@@ -1667,35 +1666,51 @@ function updateMealSummary(m){
     el.textContent='Nothing logged';
   }
 }
+
+let restoreInProgress=false;
+let lastSuccessfulRestore='';
+
+function finishAppRestore(){
+  appDataLoaded=true;
+  document.body.classList.remove('app-restoring');
+  const mask=document.getElementById('appLoadingMask');
+  if(mask){mask.classList.add('hidden');setTimeout(()=>mask.remove(),260);}
+  syncQuickChoices();
+  updateSleepScore();
+  updateDoseDayFields();
+  updateCompletion();
+  renderGameLayer();
+  setTimeout(()=>{updateCompletion();renderGameLayer();},100);
+}
+
+async function restoreVisibleDay(force=false){
+  if(restoreInProgress)return;
+  const selectedDate=document.getElementById('entryDate')?.value||todayISO();
+  if(!force && appDataLoaded && lastSuccessfulRestore===selectedDate){
+    updateCompletion();renderGameLayer();return;
+  }
+  restoreInProgress=true;
+  try{await loadDate(selectedDate);lastSuccessfulRestore=selectedDate;}
+  finally{restoreInProgress=false;}
+}
+
 async function loadDate(date){
   appDataLoaded=false;
-
   let entry=null;
-  try{
-    entry=await getEntry(date);
-  }catch(error){
-    console.warn('IndexedDB load failed',error);
-  }
-
+  try{entry=await getEntry(date);}catch(error){console.warn('IndexedDB load failed',error);}
   if(!entry){
     entry=getLocalDayBackup(date);
-    if(entry){
-      try{ await putEntry(entry); }catch(error){}
-    }
+    if(entry){try{await putEntry(entry);}catch(error){}}
   }
-
   if(entry){
     populate(entry);
   }else{
     clearFormNoConfirm();
     document.getElementById('entryDate').value=date;
     updateTopDate();
-    updateDoseDayFields();
-    updateCompletion();
   }
-
-  appDataLoaded=true;
-  renderGameLayer();
+  currentLoadedDate=date;
+  finishAppRestore();
 }
 function clearFormNoConfirm(){
   snackMealNames=['snacks'];buildMeals();lastCollectedMeals={};
@@ -2184,165 +2199,6 @@ function updateSleepScore(){
   label.textContent=`${quality} • ${hours.toFixed(1)} hours${Number.isFinite(awake)?` • ${Math.round(awake)} awake min`:''}${bedtime?` • bedtime ${bedtime}`:''}`;
   if(hidden)hidden.value=score;
 }
-
-function parseHealthImportText(raw){
-  let text=String(raw||'').trim();
-  if(!text) return null;
-
-  // Accept a full tracker URL, a raw query string, or a GLP1HEALTH-prefixed value.
-  text=text.replace(/^GLP1HEALTH[:|]\s*/i,'');
-
-  let params;
-  try{
-    if(/^https?:\/\//i.test(text)){
-      params=new URL(text).searchParams;
-    }else{
-      text=text.replace(/^\?/,'');
-      params=new URLSearchParams(text);
-    }
-  }catch(error){
-    return null;
-  }
-
-  const allowed=['steps','exercise','calories','heartRate','sleep','sleepAwake','sleepBedtime','exerciseType'];
-  const result={};
-
-  allowed.forEach(key=>{
-    const value=params.get(key);
-    if(value!==null && value!=='') result[key]=value;
-  });
-
-  return Object.keys(result).length ? result : null;
-}
-
-async function applyHealthImportValues(data){
-  const numericMap={
-    sleep:['sleep',2],
-    steps:['steps',0],
-    exercise:['exerciseMinutes',0],
-    calories:['activeCalories',1],
-    heartRate:['averageHeartRate',1],
-    sleepAwake:['sleepAwakeMinutes',0]
-  };
-
-  let imported=0;
-
-  Object.entries(numericMap).forEach(([key,[id,decimals]])=>{
-    if(data[key]===undefined) return;
-    const number=parseFloat(String(data[key]).replace(/,/g,''));
-    if(Number.isNaN(number)) return;
-    const factor=Math.pow(10,decimals);
-    const cleaned=Math.round(number*factor)/factor;
-    const field=document.getElementById(id);
-    if(field){
-      field.value=cleaned;
-      imported++;
-    }
-  });
-
-  if(data.sleepBedtime){
-    const field=document.getElementById('sleepBedtime');
-    if(field){
-      field.value=data.sleepBedtime;
-      imported++;
-    }
-  }
-
-  const activityField=document.getElementById('exerciseType');
-  if(activityField){
-    if(data.exerciseType){
-      activityField.value=data.exerciseType;
-    }else if(
-      parseFloat(data.exercise||'0')>0 ||
-      parseInt(data.steps||'0',10)>0 ||
-      parseFloat(data.calories||'0')>0
-    ){
-      activityField.value='Apple Health';
-    }
-  }
-
-  updateSleepScore();
-  syncQuickChoices();
-  updateCompletion();
-  renderGameLayer();
-
-  if(imported){
-    const entry=collect();
-    saveLocalDayBackup(entry);
-    try{ await putEntry(entry); }catch(error){}
-    currentLoadedDate=entry.date;
-
-    const status=document.getElementById('healthImportStatus');
-    if(status)status.textContent='✓ Apple Health data imported and saved in this app';
-
-    const autosave=document.getElementById('autosaveStatus');
-    if(autosave)autosave.textContent='✓ Apple Health data imported and saved';
-
-    awardTodayGameProgress();
-    updateStorageInfo();
-  }
-
-  return imported;
-}
-
-
-window.importPastedHealthData=async function(){
-  const box=document.getElementById('healthImportPasteBox');
-  const status=document.getElementById('healthImportStatus');
-  const raw=box?.value?.trim()||'';
-
-  if(!raw){
-    if(status)status.textContent='Paste the Shortcut result into the box first.';
-    alert('Tap inside the box, choose Paste, then tap Import & Save.');
-    return;
-  }
-
-  const parsed=parseHealthImportText(raw);
-  if(!parsed){
-    if(status)status.textContent='The pasted text did not contain usable Health data.';
-    alert('The pasted text was not recognized. Run the Shortcut again and copy its final Text result.');
-    return;
-  }
-
-  const count=await applyHealthImportValues(parsed);
-  if(count){
-    if(status)status.textContent='✓ Apple Health data imported and saved';
-    if(box)box.value='';
-  }else{
-    if(status)status.textContent='No usable Health values were found.';
-  }
-}
-
-window.clearHealthImportBox=function(){
-  const box=document.getElementById('healthImportPasteBox');
-  if(box)box.value='';
-  const status=document.getElementById('healthImportStatus');
-  if(status)status.textContent='';
-}
-
-window.pasteHealthImport=async function(){
-  const status=document.getElementById('healthImportStatus');
-
-  try{
-    const text=await navigator.clipboard.readText();
-    const parsed=parseHealthImportText(text);
-
-    if(!parsed){
-      if(status)status.textContent='No Apple Health import data was found on the clipboard.';
-      alert('The clipboard does not contain the Health Shortcut result. In the Shortcut, replace Open Text with Copy to Clipboard, run it again, then tap Finish Health Import.');
-      return;
-    }
-
-    const count=await applyHealthImportValues(parsed);
-    if(!count){
-      alert('Health data was found, but no usable values could be imported.');
-    }
-  }catch(error){
-    if(status)status.textContent='Clipboard access was not allowed.';
-    alert('Allow clipboard access when asked, then tap Finish Health Import again.');
-  }
-}
-
 function importHealthFromURL(){
   const p=new URLSearchParams(window.location.search);
   if(p.get('healthImport')!=='1')return false;
@@ -2422,7 +2278,12 @@ function importHealthFromURL(){
     if(a)a.textContent='✓ Apple Health data imported and saved';
 
     syncQuickChoices();
+    updateSleepScore();
+    updateDoseDayFields();
     updateCompletion();
+    renderGameLayer();
+    setTimeout(()=>{updateCompletion();renderGameLayer();},100);
+    try{history.replaceState({},document.title,location.pathname);}catch(error){}
     const activityStatus=document.getElementById('activityImportStatus');
     if(activityStatus) activityStatus.textContent='✓ Activity and minutes imported';
 
@@ -2699,8 +2560,6 @@ function renderVersion17Panels(){
 }
 
 window.runHealthShortcut=function(){
-  const status=document.getElementById('healthImportStatus');
-  if(status)status.textContent='Run the Shortcut, then return here and tap Finish Health Import.';
   window.location.href='shortcuts://run-shortcut?name=GLP-1%20Health%20Import';
 }
 
@@ -2757,18 +2616,25 @@ document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState==='hidden') saveCurrentFormLocally();
 });
 
+
+window.addEventListener('pageshow',event=>{if(event.persisted)restoreVisibleDay(true);});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(()=>restoreVisibleDay(true),50);});
+window.addEventListener('focus',()=>setTimeout(()=>restoreVisibleDay(true),50));
+
 async function init(){
   appDataLoaded=false;
+  document.body.classList.add('app-restoring');
   setTimeout(ensureCoffeeQuickAddDefaults,0);
-  buildMeals();bindQuickChoices();await openDB();document.getElementById('entryDate').value=todayISO();updateTopDate();
-  document.getElementById('entryDate').addEventListener('change',e=>loadDate(e.target.value));
+  buildMeals();
+  bindQuickChoices();
+  await openDB();
+  document.getElementById('entryDate').value=todayISO();
+  updateTopDate();
+  document.getElementById('entryDate').addEventListener('change',async e=>await loadDate(e.target.value));
   await loadDate(todayISO());
   await updateStorageInfo();
-  syncQuickChoices();updateCompletion();
   currentLoadedDate=document.getElementById('entryDate').value;
   applySettings();
-  updateDoseDayFields();
-  updateCompletion();
   if(!localStorage.getItem('glp1Settings') || !localStorage.getItem('glp1SetupV6')){
     openSetup();
     localStorage.setItem('glp1SetupV6','shown');
