@@ -497,6 +497,22 @@ main,.screen{background:transparent!important}
 .app-loading-title{margin:0;color:#10254f;font-size:1.45rem;font-weight:900}
 .app-loading-text{margin-top:7px;color:#5b6475;font-weight:700}
 body.app-restoring .screen,body.app-restoring .bottom-nav{visibility:hidden}
+
+.app-version-badge{
+  position:fixed;
+  right:8px;
+  bottom:76px;
+  z-index:9998;
+  padding:4px 7px;
+  border-radius:999px;
+  background:rgba(16,37,79,.88);
+  color:#fff;
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:.2px;
+  pointer-events:none;
+}
+
 </style>
 </head>
 <body class="app-restoring">
@@ -956,6 +972,41 @@ function delEntry(date){return new Promise((resolve,reject)=>{const t=db.transac
 
 function localDayKey(date){
   return LOCAL_DAY_PREFIX+date;
+}
+
+
+const FORM_SNAPSHOT_PREFIX='glp1-form-snapshot-';
+
+function formSnapshotKey(date){
+  return FORM_SNAPSHOT_PREFIX+String(date||todayISO());
+}
+
+function saveFormSnapshotNow(){
+  if(!appDataLoaded) return false;
+  try{
+    const entry=collect();
+    const date=document.getElementById('entryDate')?.value||todayISO();
+    entry.date=date;
+    entry.entryDate=date;
+    localStorage.setItem(formSnapshotKey(date),JSON.stringify(entry));
+    localStorage.setItem('glp1-last-visible-date',date);
+    return true;
+  }catch(error){
+    console.warn('Immediate form snapshot failed',error);
+    return false;
+  }
+}
+
+function getFormSnapshot(date){
+  try{
+    const raw=localStorage.getItem(formSnapshotKey(date));
+    if(!raw) return null;
+    const entry=JSON.parse(raw);
+    return entry && entry.date===date ? entry : null;
+  }catch(error){
+    console.warn('Form snapshot restore failed',error);
+    return null;
+  }
 }
 
 function saveLocalDayBackup(entry){
@@ -1728,6 +1779,7 @@ async function loadDate(date){
   let entry=null;
 
   try{entry=await getEntry(requestedDate);}catch(error){console.warn('IndexedDB load failed',error);}
+  if(!entry) entry=getFormSnapshot(requestedDate);
   if(!entry) entry=getLocalDayBackup(requestedDate);
 
   if(!entry){
@@ -1742,6 +1794,7 @@ async function loadDate(date){
     populate(entry);
     try{await putEntry(entry);}catch(error){}
     try{saveLocalDayBackup(entry);}catch(error){}
+    try{localStorage.setItem(formSnapshotKey(requestedDate),JSON.stringify(entry));}catch(error){}
   }else{
     resetBlankDayForDate(requestedDate);
   }
@@ -1914,6 +1967,7 @@ async function autosaveNow(){
   const visibleDate=document.getElementById('entryDate')?.value||todayISO();
   entry.date=visibleDate;
 
+  saveFormSnapshotNow();
   saveLocalDayBackup(entry);
   try{await putEntry(entry);}catch(error){console.warn('IndexedDB save failed',error);}
 
@@ -2664,18 +2718,34 @@ function queueReliableAutosave(){
   delegatedAutosaveTimer=setTimeout(()=>autosaveNow(),250);
 }
 document.addEventListener('input',event=>{
-  if(event.target?.matches('input,select,textarea')) queueReliableAutosave();
+  if(event.target?.matches('input,select,textarea')){
+    saveFormSnapshotNow();
+    queueReliableAutosave();
+  }
 });
 document.addEventListener('change',event=>{
-  if(event.target?.matches('input,select,textarea')) queueReliableAutosave();
+  if(event.target?.matches('input,select,textarea')){
+    saveFormSnapshotNow();
+    queueReliableAutosave();
+  }
 });
 window.addEventListener('pagehide',()=>{
   if(appDataLoaded){
+    saveFormSnapshotNow();
     const entry=collect();
     entry.date=document.getElementById('entryDate')?.value||todayISO();
     saveLocalDayBackup(entry);
   }
 });
+
+let serviceWorkerReloaded=false;
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(serviceWorkerReloaded) return;
+    serviceWorkerReloaded=true;
+    location.reload();
+  });
+}
 
 async function init(){
   appDataLoaded=false;
@@ -2696,7 +2766,26 @@ async function init(){
     localStorage.setItem('glp1SetupV6','shown');
   }
   if('serviceWorker' in navigator){
-    navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+    try{
+      const registration=await navigator.serviceWorker.register('service-worker.js',{updateViaCache:'none'});
+      registration.update().catch(()=>{});
+
+      if(registration.waiting){
+        registration.waiting.postMessage({type:'SKIP_WAITING'});
+      }
+
+      registration.addEventListener('updatefound',()=>{
+        const worker=registration.installing;
+        if(!worker) return;
+        worker.addEventListener('statechange',()=>{
+          if(worker.state==='installed' && navigator.serviceWorker.controller){
+            worker.postMessage({type:'SKIP_WAITING'});
+          }
+        });
+      });
+    }catch(error){
+      console.warn('Service worker registration failed',error);
+    }
   }
   importHealthFromURL();
 }
@@ -2723,5 +2812,6 @@ init();
   </div>
 </div>
 
+<div class="app-version-badge">v18.0</div>
 </body>
 </html>
