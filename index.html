@@ -2153,6 +2153,7 @@ window.undoLastAction=function(){
 }
 function checkDateRollover(){
   trackerBooted=true;
+  sessionStorage.removeItem('glp1-auth-reload-once');
   const today=todayISO();
   const dateField=document.getElementById('entryDate');
   if(currentLoadedDate && currentLoadedDate!==today && dateField.value===currentLoadedDate){
@@ -3149,16 +3150,6 @@ window.addEventListener('pagehide',()=>{
   }
 });
 
-let serviceWorkerReloaded=false;
-if('serviceWorker' in navigator){
-  navigator.serviceWorker.addEventListener('controllerchange',()=>{
-    if(serviceWorkerReloaded) return;
-    serviceWorkerReloaded=true;
-    location.reload();
-  });
-}
-
-
 function restoreLocalFirst(date){
   let entry=null;
 
@@ -3445,16 +3436,34 @@ async function initializeSupabase(){
 
   sb.auth.onAuthStateChange((event,session)=>{
     const nextUser=session?.user||null;
+
+    // INITIAL_SESSION fires as part of normal page startup.
+    // Never reload for it or we create a refresh loop.
+    if(event==='INITIAL_SESSION'){
+      return;
+    }
+
     if(nextUser){
       cloudReady=true;
       showAuthenticatedUI(nextUser);
       setCloudStatus('Cloud connected','ok');
-      if(!trackerBooted){
-        setTimeout(()=>location.reload(),150);
-      }else{
-        setTimeout(()=>migrateAndMergeCloud(),50);
+
+      // Only a genuine sign-in event may need one clean reload
+      // if the tracker boot previously stopped at the login gate.
+      if(event==='SIGNED_IN' && !trackerBooted){
+        const reloadKey='glp1-auth-reload-once';
+        if(!sessionStorage.getItem(reloadKey)){
+          sessionStorage.setItem(reloadKey,'1');
+          setTimeout(()=>location.reload(),200);
+          return;
+        }
       }
-    }else{
+
+      sessionStorage.removeItem('glp1-auth-reload-once');
+      if(trackerBooted){
+        setTimeout(()=>migrateAndMergeCloud(),100);
+      }
+    }else if(event==='SIGNED_OUT'){
       showSignedOutUI();
     }
   });
@@ -3555,6 +3564,6 @@ init();
   </div>
 </div>
 
-<div class="app-version-badge">v19.0</div>
+<div class="app-version-badge">v19.1</div>
 </body>
 </html>

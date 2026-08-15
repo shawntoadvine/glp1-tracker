@@ -1,4 +1,4 @@
-const CACHE='glp1-tracker-v19-auth-cloud';
+const CACHE='glp1-tracker-v19-1-auth-reload-fix';
 const ASSETS=[
   './',
   './index.html',
