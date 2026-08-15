@@ -566,7 +566,7 @@ body.app-restoring .screen,body.app-restoring .bottom-nav{visibility:hidden}
     <div class="game-stats">
       <div class="game-stat"><strong id="gameSleep">—</strong><span>Sleep</span></div>
       <div class="game-stat"><strong id="gameWater">0</strong><span>Water</span></div>
-      <div class="game-stat"><strong id="gameSleepScore">—</strong><span>Sleep Score</span></div>
+      <div class="game-stat"><strong id="gameSleepScore">—</strong><span id="gameSleepScoreLabel">Sleep Score</span></div>
     </div>
 
     <button type="button" class="calorie-today-card" onclick="openCaloriesBreakdown()">
@@ -589,7 +589,7 @@ body.app-restoring .screen,body.app-restoring .bottom-nav{visibility:hidden}
       <div class="game-stat"><div style="font-size:1.7rem">💧</div><strong id="overviewWater">0 oz</strong><span>Water</span></div>
       <div class="game-stat"><div style="font-size:1.7rem">🍽️</div><strong id="overviewHunger">—</strong><span>Hunger Today</span></div>
       <div class="game-stat"><div style="font-size:1.7rem">⚡</div><strong id="overviewEnergy">—</strong><span>Energy</span></div>
-      <div class="game-stat"><div style="font-size:1.7rem">🛡️</div><strong id="overviewSleepScore">—</strong><span>Sleep Score</span></div>
+      <div class="game-stat"><div style="font-size:1.7rem">🛡️</div><strong id="overviewSleepScore">—</strong><span id="overviewSleepScoreLabel">Sleep Score</span></div>
       <div class="game-stat"><div style="font-size:1.7rem">🔥</div><strong id="overviewCalories">0</strong><span>Calories Today</span></div>
     </div>
   </div>
@@ -1400,7 +1400,10 @@ let lastCollectedMeals={};
 function collect(){
   const e={
     date:val('entryDate'), entryDate:val('entryDate'), dose:val('dose'), injectionTime:val('injectionTime'),
-    injectionSite:val('injectionSite'), weight:val('weight'), sleep:val('sleep'), sleepAwakeMinutes:val('sleepAwakeMinutes'), sleepBedtime:val('sleepBedtime'), sleepScore:val('sleepScore'), water:val('water'),
+    injectionSite:val('injectionSite'), weight:val('weight'), sleep:val('sleep'), sleepAwakeMinutes:val('sleepAwakeMinutes'), sleepBedtime:val('sleepBedtime'), sleepScore:val('sleepScore'),
+    sleepScoreSource:document.getElementById('sleepScore')?.dataset.scoreSource||'',
+    appleSleepScore:document.getElementById('sleepScore')?.dataset.appleScore||'',
+    water:val('water'),
     hunger:val('hunger'), energy:val('energy'), generalNotes:val('generalNotes'),
     symptomNotes:val('symptomNotes'), symptoms:checkedSymptoms(),
     exerciseType:val('exerciseType'), exerciseMinutes:val('exerciseMinutes'), steps:val('steps'), activeCalories:val('activeCalories'), averageHeartRate:val('averageHeartRate'),
@@ -1446,9 +1449,20 @@ function populate(e){
   lastCollectedMeals=JSON.parse(JSON.stringify(e.meals||{}));
   populateMealFields(e.meals||{});
   currentLoadedDate=e.date;
+  const sleepScoreEl=document.getElementById('sleepScore');
+  if(sleepScoreEl){
+    sleepScoreEl.dataset.scoreSource=e.sleepScoreSource||'';
+    sleepScoreEl.dataset.appleScore=e.appleSleepScore||'';
+  }
   updateTopDate();
   syncQuickChoices();
-  updateSleepScore();
+  const importedAppleSleepScore=p.get('sleepScore')||p.get('appleSleepScore');
+  if(importedAppleSleepScore){
+    setAppleSleepScore(importedAppleSleepScore);
+    imported.push('sleepScore');
+  }else{
+    updateSleepScore();
+  }
   updateDoseDayFields();
   updateCompletion();
 }
@@ -1703,6 +1717,7 @@ function finishAppRestore(){
   updateDoseDayFields();
   updateCompletion();
   renderGameLayer();
+  rebuildGameFromHistory();
   setTimeout(()=>{updateCompletion();renderGameLayer();},100);
 }
 
@@ -2063,6 +2078,7 @@ window.saveCurrentDay=async function(){
     updateSleepScore();
     updateCompletion();
     renderGameLayer();
+    rebuildGameFromHistory();
     renderHistory();
     updateStorageInfo();
     showSaved();
@@ -2189,7 +2205,7 @@ async function renderHistory(){
 }
 window.loadHistory=async function(date){switchScreen('today');await loadDate(date)}
 window.removeHistory=async function(date){if(confirm('Delete '+date+'?')){await delEntry(date);
-  deleteLocalDayBackup(date);renderHistory()}}
+  deleteLocalDayBackup(date);renderHistory();rebuildGameFromHistory()}}
 
 function switchScreen(id){
   document.querySelectorAll('.screen').forEach(x=>x.classList.toggle('active',x.id===id));
@@ -2302,6 +2318,25 @@ function previousBedtimes(){
     return values.slice(-14);
   }catch(e){return [];}
 }
+function setAppleSleepScore(value){
+  const scoreBox=document.getElementById('sleepScoreValue');
+  const label=document.getElementById('sleepScoreLabel');
+  const hidden=document.getElementById('sleepScore');
+  const score=Number(value);
+
+  if(!Number.isFinite(score) || score<=0 || score>100) return false;
+
+  const rounded=Math.round(score);
+  if(hidden){
+    hidden.value=rounded;
+    hidden.dataset.scoreSource='apple';
+    hidden.dataset.appleScore=String(rounded);
+  }
+  if(scoreBox)scoreBox.textContent=rounded;
+  if(label)label.textContent='Apple Sleep Score';
+  return true;
+}
+
 function updateSleepScore(){
   const hours=Number(document.getElementById('sleep')?.value);
   const awake=Number(document.getElementById('sleepAwakeMinutes')?.value);
@@ -2309,10 +2344,23 @@ function updateSleepScore(){
   const scoreBox=document.getElementById('sleepScoreValue');
   const label=document.getElementById('sleepScoreLabel');
   const hidden=document.getElementById('sleepScore');
+
+  const appleScore=Number(hidden?.dataset.appleScore||0);
+  if(hidden?.dataset.scoreSource==='apple' && appleScore>0){
+    if(scoreBox)scoreBox.textContent=Math.round(appleScore);
+    if(label)label.textContent='Apple Sleep Score';
+    hidden.value=Math.round(appleScore);
+    return;
+  }
+
   if(!scoreBox||!label||!Number.isFinite(hours)||hours<=0){
     if(scoreBox)scoreBox.textContent='—';
-    if(label)label.textContent='Waiting for Apple Health sleep data';
-    if(hidden)hidden.value='';
+    if(label)label.textContent='No sleep score available';
+    if(hidden){
+      hidden.value='';
+      hidden.dataset.scoreSource='';
+      hidden.dataset.appleScore='';
+    }
     return;
   }
 
@@ -2345,9 +2393,14 @@ function updateSleepScore(){
 
   const score=Math.round(clampSleepScore(duration+awakePts+consistency,0,100));
   const quality=score>=90?'Excellent':score>=80?'Very good':score>=70?'Good':score>=60?'Fair':'Needs attention';
+
   scoreBox.textContent=score;
-  label.textContent=`${quality} • ${hours.toFixed(1)} hours${Number.isFinite(awake)?` • ${Math.round(awake)} awake min`:''}${bedtime?` • bedtime ${bedtime}`:''}`;
-  if(hidden)hidden.value=score;
+  label.textContent=`Tracker Estimate • ${quality}`;
+  if(hidden){
+    hidden.value=score;
+    hidden.dataset.scoreSource='estimate';
+    hidden.dataset.appleScore='';
+  }
 }
 function importHealthFromURL(){
   const p=new URLSearchParams(window.location.search);
@@ -2591,6 +2644,162 @@ window.closeCaloriesBreakdown=function(){
   if(pop)pop.style.display='none';
 }
 
+
+let gameHistoryRefreshInProgress=false;
+let gameHistoryRefreshQueued=false;
+
+function entryHasValue(value){
+  return value!==undefined && value!==null && String(value).trim()!=='' && Number(value)!==0;
+}
+
+function entryMealLogged(entry){
+  return Object.values(entry?.meals||{}).some(meal=>
+    String(meal?.description||'').trim() ||
+    Number(meal?.calories||0)>0
+  );
+}
+
+function applicableQuestsForEntry(entry){
+  const date=entry?.date||entry?.entryDate||'';
+  const quests=[
+    {id:'sleep',xp:20,done:Number(entry?.sleep||0)>0},
+    {id:'water',xp:20,done:Number(entry?.water||0)>0},
+    {id:'meal',xp:30,done:entryMealLogged(entry)},
+    {id:'checkin',xp:30,done:entryHasValue(entry?.hunger) && entryHasValue(entry?.energy)},
+    {id:'activity',xp:30,done:
+      Number(entry?.steps||0)>0 ||
+      Number(entry?.exerciseMinutes||0)>0 ||
+      Number(entry?.activeCalories||0)>0
+    }
+  ];
+
+  if(date){
+    const selected=new Date(`${date}T12:00:00`);
+    if(selected.getDay()===getConfiguredDoseDay()){
+      quests.push({
+        id:'dose',
+        xp:40,
+        done:entryHasValue(entry?.dose) &&
+          entryHasValue(entry?.injectionTime) &&
+          entryHasValue(entry?.injectionSite)
+      });
+    }
+  }
+
+  return quests;
+}
+
+function dateBefore(date){
+  const d=new Date(`${date}T12:00:00`);
+  d.setDate(d.getDate()-1);
+  return d.toISOString().slice(0,10);
+}
+
+function deriveGameStateFromEntries(entries){
+  const valid=(entries||[])
+    .filter(entry=>entry && (entry.date||entry.entryDate))
+    .map(entry=>({...entry,date:entry.date||entry.entryDate}))
+    .sort((a,b)=>a.date.localeCompare(b.date));
+
+  let xp=0;
+  const activeDates=[];
+  const completedDates=[];
+
+  valid.forEach(entry=>{
+    const quests=applicableQuestsForEntry(entry);
+    const completed=quests.filter(q=>q.done);
+    const earned=completed.reduce((sum,q)=>sum+q.xp,0);
+    const allDone=quests.length>0 && quests.every(q=>q.done);
+
+    if(earned>0){
+      activeDates.push(entry.date);
+      xp+=earned;
+    }
+    if(allDone){
+      xp+=100;
+      completedDates.push(entry.date);
+    }
+  });
+
+  const uniqueDates=[...new Set(activeDates)].sort();
+  let longestStreak=0;
+  let currentStreak=0;
+  let previous='';
+
+  uniqueDates.forEach(date=>{
+    currentStreak=previous && dateBefore(date)===previous ? currentStreak+1 : 1;
+    longestStreak=Math.max(longestStreak,currentStreak);
+    previous=date;
+  });
+
+  // Display the streak ending on the latest logged date.
+  let streak=0;
+  if(uniqueDates.length){
+    streak=1;
+    for(let i=uniqueDates.length-1;i>0;i--){
+      if(dateBefore(uniqueDates[i])===uniqueDates[i-1]) streak++;
+      else break;
+    }
+  }
+
+  return {
+    xp,
+    coins:Math.floor(xp/10),
+    level:levelForXp(xp),
+    streak,
+    longestStreak,
+    lastQuestDate:uniqueDates.at(-1)||'',
+    completedDates
+  };
+}
+
+async function rebuildGameFromHistory(){
+  if(gameHistoryRefreshInProgress){
+    gameHistoryRefreshQueued=true;
+    return;
+  }
+
+  gameHistoryRefreshInProgress=true;
+  try{
+    const entries=await getAll();
+    const state=deriveGameStateFromEntries(entries);
+    saveGameState(state);
+    updateGameStateDisplay(state);
+  }catch(error){
+    console.warn('Game history rebuild failed',error);
+  }finally{
+    gameHistoryRefreshInProgress=false;
+    if(gameHistoryRefreshQueued){
+      gameHistoryRefreshQueued=false;
+      rebuildGameFromHistory();
+    }
+  }
+}
+
+function updateGameStateDisplay(state){
+  const level=levelForXp(state.xp||0);
+  const xpInto=(state.xp||0)%500;
+
+  const levelEl=document.getElementById('gameLevel');
+  const coinsEl=document.getElementById('gameCoins');
+  const streakEl=document.getElementById('gameStreak');
+  const xpText=document.getElementById('gameXpText');
+  const xpFill=document.getElementById('gameXpFill');
+
+  if(levelEl) levelEl.textContent=level;
+  if(coinsEl) coinsEl.textContent=state.coins||0;
+  if(streakEl) streakEl.textContent=state.streak||0;
+  if(xpText) xpText.textContent=`${xpInto} / 500`;
+  if(xpFill) xpFill.style.width=`${Math.round(xpInto/500*100)}%`;
+
+  const badgeStreak=document.getElementById('badgeStreak');
+  if(badgeStreak) badgeStreak.textContent=`${state.streak||0} days`;
+
+  const nextReward=Math.max(1,5-((state.streak||0)%5));
+  const nextRewardEl=document.getElementById('nextRewardDays');
+  if(nextRewardEl) nextRewardEl.textContent=nextReward;
+}
+
 function renderGameLayer(){
   setTimeout(renderVersion17Panels,0);
   const quests=questStatus();
@@ -2605,21 +2814,8 @@ function renderGameLayer(){
   }
 
   const state=getGameState();
-  const level=levelForXp(state.xp);
-  state.level=level;
-  saveGameState(state);
-
-  const xpInto=state.xp%500;
-  const levelEl=document.getElementById('gameLevel');
-  const coinsEl=document.getElementById('gameCoins');
-  const streakEl=document.getElementById('gameStreak');
-  const xpText=document.getElementById('gameXpText');
-  const xpFill=document.getElementById('gameXpFill');
-  if(levelEl)levelEl.textContent=level;
-  if(coinsEl)coinsEl.textContent=state.coins;
-  if(streakEl)streakEl.textContent=state.streak;
-  if(xpText)xpText.textContent=`${xpInto} / 500`;
-  if(xpFill)xpFill.style.width=`${Math.round(xpInto/500*100)}%`;
+  updateGameStateDisplay(state);
+  setTimeout(()=>rebuildGameFromHistory(),0);
 
   const sleep=parseFloat(document.getElementById('sleep')?.value||'0');
   const water=parseInt(document.getElementById('water')?.value||'0',10);
@@ -2628,6 +2824,9 @@ function renderGameLayer(){
   if(document.getElementById('gameSleep'))document.getElementById('gameSleep').textContent=sleep?`${sleep.toFixed(1)}h`:'—';
   if(document.getElementById('gameWater'))document.getElementById('gameWater').textContent=`${water*(settings.waterOz||12)} oz`;
   if(document.getElementById('gameSleepScore'))document.getElementById('gameSleepScore').textContent=score||'—';
+  const scoreSource=document.getElementById('sleepScore')?.dataset.scoreSource||'';
+  const gameScoreLabel=document.getElementById('gameSleepScoreLabel');
+  if(gameScoreLabel)gameScoreLabel.textContent=scoreSource==='apple'?'Apple Sleep Score':score?'Sleep Score Estimate':'Sleep Score';
   const caloriesTotal=caloriesTodayTotal();
   const caloriesEl=document.getElementById('gameCaloriesToday');
   if(caloriesEl)caloriesEl.textContent=Math.round(caloriesTotal).toLocaleString();
@@ -2674,6 +2873,9 @@ function renderVersion17Panels(){
     const el=document.getElementById(id);
     if(el)el.textContent=value;
   });
+  const overviewScoreSource=document.getElementById('sleepScore')?.dataset.scoreSource||'';
+  const overviewScoreLabel=document.getElementById('overviewSleepScoreLabel');
+  if(overviewScoreLabel)overviewScoreLabel.textContent=overviewScoreSource==='apple'?'Apple Sleep Score':sleepScore?'Sleep Score Estimate':'Sleep Score';
 
   const mealHolder=document.getElementById('gameMealsProgress');
   if(mealHolder){
@@ -2714,35 +2916,7 @@ window.runHealthShortcut=function(){
 }
 
 function awardTodayGameProgress(){
-  const entryDate=document.getElementById('entryDate')?.value||todayISO();
-  const state=getGameState();
-  const quests=questStatus();
-  const allDone=quests.every(q=>q.done);
-
-  if(!state.completedDates.includes(entryDate) && allDone){
-    const oldLevel=levelForXp(state.xp);
-    const earned=quests.reduce((sum,q)=>sum+q.xp,0)+100;
-    state.xp+=earned;
-    state.coins+=Math.round(earned/10);
-    state.completedDates.push(entryDate);
-
-    const yesterday=new Date(`${entryDate}T12:00:00`);
-    yesterday.setDate(yesterday.getDate()-1);
-    const yesterdayISO=yesterday.toISOString().slice(0,10);
-    state.streak=state.lastQuestDate===yesterdayISO ? state.streak+1 : 1;
-    state.lastQuestDate=entryDate;
-
-    const newLevel=levelForXp(state.xp);
-    saveGameState(state);
-
-    if(newLevel>oldLevel){
-      const pop=document.getElementById('levelUpPop');
-      const text=document.getElementById('levelUpText');
-      if(text)text.textContent=`You reached Level ${newLevel}: GLP-1 Hero!`;
-      if(pop)pop.style.display='flex';
-    }
-  }
-
+  rebuildGameFromHistory();
   renderGameLayer();
 }
 
@@ -2905,6 +3079,6 @@ init();
   </div>
 </div>
 
-<div class="app-version-badge">v18.1</div>
+<div class="app-version-badge">v18.3</div>
 </body>
 </html>

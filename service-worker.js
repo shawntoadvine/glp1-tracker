@@ -1,4 +1,4 @@
-const CACHE='glp1-tracker-v18-1-activity-save';
+const CACHE='glp1-tracker-v18-3-sleep-score';
 const ASSETS=[
   './',
   './index.html',
