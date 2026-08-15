@@ -496,7 +496,7 @@ main,.screen{background:transparent!important}
 .app-loading-avatar{width:92px;height:92px;border-radius:50%;object-fit:cover;border:4px solid #fff;box-shadow:0 0 0 4px #2e6cf6,0 0 0 8px #f6bd3e;margin-bottom:14px}
 .app-loading-title{margin:0;color:#10254f;font-size:1.45rem;font-weight:900}
 .app-loading-text{margin-top:7px;color:#5b6475;font-weight:700}
-body.app-restoring .screen,body.app-restoring .bottom-nav{visibility:hidden}
+body.app-restoring .screen,body.app-restoring .bottom-nav{visibility:visible}
 
 .app-version-badge{
   position:fixed;
@@ -513,10 +513,132 @@ body.app-restoring .screen,body.app-restoring .bottom-nav{visibility:hidden}
   pointer-events:none;
 }
 
+
+.auth-gate{
+  position:fixed;
+  inset:0;
+  z-index:20000;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+  background:linear-gradient(180deg,#eaf4ff,#f8fbff);
+}
+.auth-gate.hidden{display:none}
+.auth-card{
+  width:min(430px,100%);
+  background:#fff;
+  border:3px solid #f3bd43;
+  border-radius:28px;
+  padding:28px 24px;
+  box-shadow:0 20px 70px rgba(8,31,68,.20);
+  text-align:center;
+}
+.auth-avatar{
+  width:104px;
+  height:104px;
+  border-radius:50%;
+  object-fit:cover;
+  border:4px solid #fff;
+  box-shadow:0 0 0 4px #2f6df6,0 0 0 8px #f5bd3e;
+  margin-bottom:18px;
+}
+.auth-card h1{
+  margin:0 0 8px;
+  color:#10254f;
+  font-size:1.7rem;
+}
+.auth-card p{
+  color:#667085;
+  font-weight:650;
+  line-height:1.4;
+}
+.auth-card input{
+  width:100%;
+  box-sizing:border-box;
+  font-size:16px;
+  padding:14px 16px;
+  border-radius:14px;
+  border:2px solid #d8e1ee;
+  margin-top:14px;
+}
+.auth-card .auth-button{
+  width:100%;
+  margin-top:12px;
+  padding:14px 16px;
+  border:0;
+  border-radius:14px;
+  background:#2166e5;
+  color:#fff;
+  font-weight:900;
+  font-size:1rem;
+}
+.auth-status{
+  min-height:22px;
+  margin-top:12px;
+  color:#475467;
+  font-weight:700;
+}
+.cloud-pill{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:5px 9px;
+  border-radius:999px;
+  background:#eef6ff;
+  border:1px solid #c8dfff;
+  color:#154a98;
+  font-size:11px;
+  font-weight:900;
+  margin-left:8px;
+}
+.cloud-pill.ok{
+  background:#ecfdf3;
+  border-color:#abefc6;
+  color:#067647;
+}
+.cloud-pill.warn{
+  background:#fffaeb;
+  border-color:#fedf89;
+  color:#b54708;
+}
+.account-strip{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  padding:7px 12px;
+  font-size:11px;
+  color:#667085;
+}
+.account-strip button{
+  border:0;
+  background:transparent;
+  color:#2166e5;
+  font-weight:800;
+}
+
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
+<div id="authGate" class="auth-gate">
+  <div class="auth-card">
+    <img src="avatar.png" alt="" class="auth-avatar">
+    <h1>GLP-1 Tracker</h1>
+    <p>Your tracker is now private and cloud synced. Enter your email and we’ll send you a secure sign-in link.</p>
+    <input id="authEmail" type="email" inputmode="email" autocomplete="email" placeholder="Email address">
+    <button type="button" class="auth-button" onclick="sendMagicLink()">Email Me a Sign-In Link</button>
+    <div id="authStatus" class="auth-status"></div>
+  </div>
+</div>
 
+<div id="accountStrip" class="account-strip" style="display:none">
+  <div>
+    <span id="signedInEmail"></span>
+    <span id="cloudSyncStatus" class="cloud-pill">Cloud starting…</span>
+  </div>
+  <button type="button" onclick="signOutTracker()">Sign out</button>
 </div>
 <div class="app">
   <div class="topbar">
@@ -1706,15 +1828,13 @@ let lastSuccessfulRestore='';
 function finishAppRestore(){
   appDataLoaded=true;
   document.body.classList.remove('app-restoring');
-  try{syncQuickChoices();}catch(error){console.warn(error);}
-  try{updateSleepScore();}catch(error){console.warn(error);}
-  try{updateDoseDayFields();}catch(error){console.warn(error);}
-  try{updateCompletion();}catch(error){console.warn(error);}
-  try{renderGameLayer();}catch(error){console.warn(error);}
-  try{rebuildGameFromHistory();}catch(error){console.warn(error);}
-  setTimeout(()=>{
-    try{updateCompletion();renderGameLayer();}catch(error){}
-  },100);
+  syncQuickChoices();
+  updateSleepScore();
+  updateDoseDayFields();
+  updateCompletion();
+  renderGameLayer();
+  rebuildGameFromHistory();
+  setTimeout(()=>{updateCompletion();renderGameLayer();},100);
 }
 
 async function restoreVisibleDay(force=false){
@@ -1731,6 +1851,9 @@ async function restoreVisibleDay(force=false){
   try{
     await loadDate(selectedDate);
     lastSuccessfulRestore=selectedDate;
+  }catch(error){
+    console.warn('Background restore failed',error);
+    appDataLoaded=true;
   }finally{
     restoreInProgress=false;
   }
@@ -1789,7 +1912,15 @@ async function loadDate(date){
   const requestedDate=String(date||todayISO());
   let entry=null;
 
-  try{entry=await getEntry(requestedDate);}catch(error){console.warn('IndexedDB load failed',error);}
+  // Authenticated cloud copy is authoritative when available.
+  if(cloudReady && cloudUser){
+    try{entry=await fetchCloudEntry(requestedDate);}catch(error){}
+  }
+
+  // Offline/local fallback.
+  if(!entry){
+    try{entry=await getEntry(requestedDate);}catch(error){console.warn('IndexedDB load failed',error);}
+  }
   if(!entry) entry=getFormSnapshot(requestedDate);
   if(!entry) entry=getLocalDayBackup(requestedDate);
 
@@ -1981,6 +2112,7 @@ async function autosaveNow(){
   saveFormSnapshotNow();
   saveLocalDayBackup(entry);
   try{await putEntry(entry);}catch(error){console.warn('IndexedDB save failed',error);}
+  scheduleCloudSave(entry);
 
   currentLoadedDate=visibleDate;
   lastSuccessfulRestore=visibleDate;
@@ -2020,6 +2152,7 @@ window.undoLastAction=function(){
   document.getElementById('undoToast').classList.remove('show');
 }
 function checkDateRollover(){
+  trackerBooted=true;
   const today=todayISO();
   const dateField=document.getElementById('entryDate');
   if(currentLoadedDate && currentLoadedDate!==today && dateField.value===currentLoadedDate){
@@ -2064,6 +2197,7 @@ window.saveCurrentDay=async function(){
     localStorage.setItem('glp1-last-visible-date',visibleDate);
     saveLocalDayBackup(entry);
     await putEntry(entry);
+    await cloudUpsertEntry(entry);
 
     currentLoadedDate=visibleDate;
     lastSuccessfulRestore=visibleDate;
@@ -2199,15 +2333,24 @@ async function renderHistory(){
     </div>`).join('');
 }
 window.loadHistory=async function(date){switchScreen('today');await loadDate(date)}
-window.removeHistory=async function(date){if(confirm('Delete '+date+'?')){await delEntry(date);
-  deleteLocalDayBackup(date);renderHistory();rebuildGameFromHistory()}}
+window.removeHistory=async function(date){
+  if(!confirm('Delete '+date+'?'))return;
 
-function switchScreen(id){
-  document.querySelectorAll('.screen').forEach(x=>x.classList.toggle('active',x.id===id));
-  document.querySelectorAll('.nav-btn').forEach(x=>x.classList.toggle('active',x.dataset.screen===id));
-  document.getElementById('screenTitle').textContent={today:'Today',meals:'Meals',symptoms:'Check-In',activity:'Activity',history:'History'}[id];
-  if(id==='history'){renderHistory();updateStorageInfo();}
-  window.scrollTo({top:0,behavior:'smooth'});
+  await delEntry(date);
+  deleteLocalDayBackup(date);
+  try{localStorage.removeItem(formSnapshotKey(date));}catch(error){}
+
+  if(cloudReady&&cloudUser&&sb){
+    const {error}=await sb
+      .from('glp1_entries')
+      .delete()
+      .eq('user_id',cloudUser.id)
+      .eq('entry_date',date);
+    if(error)console.warn('Cloud delete failed',error);
+  }
+
+  renderHistory();
+  rebuildGameFromHistory();
 }
 document.querySelectorAll('.nav-btn').forEach(b=>b.addEventListener('click',()=>switchScreen(b.dataset.screen)));
 
@@ -2280,7 +2423,16 @@ window.clearAllData=async function(){
 
 
 window.runHealthShortcut=function(){
-  window.location.href='shortcuts://run-shortcut?name=GLP-1%20Health%20Import';
+  const shortcutURL='shortcuts://run-shortcut?name=GLP-1%20Health%20Import';
+
+  // Web-only workflow: launch Shortcuts immediately.
+  // Do not save, show a loading mask, read the clipboard, or perform any async work first.
+  try{
+    window.location.href=shortcutURL;
+  }catch(error){
+    console.error('Shortcut launch failed',error);
+    alert('Could not open the GLP-1 Health Import Shortcut.');
+  }
 }
 
 window.showHealthImportHelp=function(){
@@ -2997,64 +3149,387 @@ window.addEventListener('pagehide',()=>{
   }
 });
 
+let serviceWorkerReloaded=false;
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(serviceWorkerReloaded) return;
+    serviceWorkerReloaded=true;
+    location.reload();
+  });
+}
 
-async function init(){
-  appDataLoaded=false;
 
-  try{setTimeout(ensureCoffeeQuickAddDefaults,0);}catch(error){}
-  try{buildMeals();}catch(error){console.warn('buildMeals failed',error);}
-  try{bindQuickChoices();}catch(error){console.warn('bindQuickChoices failed',error);}
+function restoreLocalFirst(date){
+  let entry=null;
 
-  try{
-    await openDB();
-  }catch(error){
-    console.warn('IndexedDB open failed',error);
+  try{entry=getFormSnapshot(date);}catch(error){}
+  if(!entry){
+    try{entry=getLocalDayBackup(date);}catch(error){}
+  }
+  if(!entry){
+    try{
+      const raw=localStorage.getItem('glp1LatestBackup');
+      const latest=raw?JSON.parse(raw):null;
+      if(latest && latest.date===date) entry=latest;
+    }catch(error){}
   }
 
+  if(entry && entry.date===date){
+    populate(entry);
+    currentLoadedDate=date;
+    lastSuccessfulRestore=date;
+    return true;
+  }
+
+  return false;
+}
+
+function withTimeout(promise,ms){
+  return Promise.race([
+    promise,
+    new Promise((_,reject)=>setTimeout(()=>reject(new Error('timeout')),ms))
+  ]);
+}
+
+
+const SUPABASE_URL='https://xgoenllieurkhpkwwcvj.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY='sb_publishable_KDU_N7tCOWsA-weRhPQb3A_cO6Bnlym';
+let sb=null;
+let cloudUser=null;
+let cloudReady=false;
+let cloudSaveTimer=null;
+let cloudSyncBusy=false;
+let trackerBooted=false;
+
+function setCloudStatus(text,state=''){
+  const el=document.getElementById('cloudSyncStatus');
+  if(!el)return;
+  el.textContent=text;
+  el.classList.remove('ok','warn');
+  if(state)el.classList.add(state);
+}
+
+function showAuthenticatedUI(user){
+  cloudUser=user||null;
+  document.getElementById('authGate')?.classList.add('hidden');
+  const strip=document.getElementById('accountStrip');
+  if(strip)strip.style.display='flex';
+  const email=document.getElementById('signedInEmail');
+  if(email)email.textContent=user?.email||'Signed in';
+}
+
+function showSignedOutUI(){
+  cloudUser=null;
+  cloudReady=false;
+  const strip=document.getElementById('accountStrip');
+  if(strip)strip.style.display='none';
+  document.getElementById('authGate')?.classList.remove('hidden');
+}
+
+async function sendMagicLink(){
+  const email=document.getElementById('authEmail')?.value?.trim();
+  const status=document.getElementById('authStatus');
+  if(!email){
+    if(status)status.textContent='Enter your email address first.';
+    return;
+  }
+  if(!sb){
+    if(status)status.textContent='Cloud login is still starting. Try again in a moment.';
+    return;
+  }
+  if(status)status.textContent='Sending secure sign-in link…';
+  const {error}=await sb.auth.signInWithOtp({
+    email,
+    options:{
+      emailRedirectTo:'https://shawntoadvine.github.io/glp1-tracker/'
+    }
+  });
+  if(error){
+    if(status)status.textContent='Could not send the sign-in link: '+error.message;
+    return;
+  }
+  if(status)status.textContent='Check your email and tap the sign-in link. You can close this message after that.';
+}
+
+async function signOutTracker(){
+  if(sb)await sb.auth.signOut();
+  showSignedOutUI();
+}
+
+function localEntryTimestamp(entry){
+  const raw=entry?.cloudUpdatedAt||entry?.modifiedAt||entry?.updatedAt||'';
+  const time=Date.parse(raw);
+  return Number.isFinite(time)?time:0;
+}
+
+function stampEntryForCloud(entry){
+  const copy=JSON.parse(JSON.stringify(entry||{}));
+  const now=new Date().toISOString();
+  copy.cloudUpdatedAt=now;
+  copy.modifiedAt=now;
+  return copy;
+}
+
+async function cloudUpsertEntry(entry,quiet=false){
+  if(!cloudReady||!cloudUser||!sb||!entry?.date)return false;
+
+  const stamped=stampEntryForCloud(entry);
+  try{
+    if(!quiet)setCloudStatus('Cloud saving…');
+    const {error}=await sb
+      .from('glp1_entries')
+      .upsert({
+        user_id:cloudUser.id,
+        entry_date:stamped.date,
+        data:stamped,
+        updated_at:stamped.cloudUpdatedAt
+      },{onConflict:'user_id,entry_date'});
+
+    if(error)throw error;
+
+    // Keep local copy stamped too.
+    try{
+      localStorage.setItem(formSnapshotKey(stamped.date),JSON.stringify(stamped));
+      saveLocalDayBackup(stamped);
+    }catch(e){}
+
+    if(!quiet)setCloudStatus('Cloud synced','ok');
+    return true;
+  }catch(error){
+    console.warn('Cloud save failed',error);
+    if(!quiet)setCloudStatus('Saved locally • cloud retry','warn');
+    return false;
+  }
+}
+
+function scheduleCloudSave(entry){
+  if(!cloudReady||!cloudUser)return;
+  clearTimeout(cloudSaveTimer);
+  const copy=JSON.parse(JSON.stringify(entry||collect()));
+  copy.date=copy.date||document.getElementById('entryDate')?.value||todayISO();
+  cloudSaveTimer=setTimeout(()=>cloudUpsertEntry(copy),500);
+}
+
+async function fetchCloudEntry(date){
+  if(!cloudReady||!cloudUser||!sb)return null;
+  const {data,error}=await sb
+    .from('glp1_entries')
+    .select('entry_date,data,updated_at')
+    .eq('user_id',cloudUser.id)
+    .eq('entry_date',date)
+    .maybeSingle();
+
+  if(error){
+    console.warn('Cloud entry fetch failed',error);
+    return null;
+  }
+  if(!data)return null;
+
+  const entry=data.data||{};
+  entry.date=data.entry_date;
+  entry.entryDate=data.entry_date;
+  entry.cloudUpdatedAt=data.updated_at||entry.cloudUpdatedAt||'';
+  return entry;
+}
+
+async function fetchAllCloudEntries(){
+  if(!cloudReady||!cloudUser||!sb)return [];
+  const {data,error}=await sb
+    .from('glp1_entries')
+    .select('entry_date,data,updated_at')
+    .eq('user_id',cloudUser.id)
+    .order('entry_date',{ascending:true});
+
+  if(error){
+    console.warn('Cloud history fetch failed',error);
+    return [];
+  }
+  return (data||[]).map(row=>{
+    const entry=row.data||{};
+    entry.date=row.entry_date;
+    entry.entryDate=row.entry_date;
+    entry.cloudUpdatedAt=row.updated_at||entry.cloudUpdatedAt||'';
+    return entry;
+  });
+}
+
+async function writeLocalEntry(entry){
+  if(!entry?.date)return;
+  try{localStorage.setItem(formSnapshotKey(entry.date),JSON.stringify(entry));}catch(e){}
+  try{saveLocalDayBackup(entry);}catch(e){}
+  try{await putEntry(entry);}catch(e){}
+}
+
+async function migrateAndMergeCloud(){
+  if(cloudSyncBusy||!cloudReady||!cloudUser)return;
+  cloudSyncBusy=true;
+  setCloudStatus('Syncing history…');
+
+  try{
+    let localEntries=[];
+    try{localEntries=await getAll();}catch(e){}
+
+    // Include localStorage-only current records if IndexedDB missed them.
+    const localMap=new Map();
+    (localEntries||[]).forEach(e=>{if(e?.date)localMap.set(e.date,e);});
+
+    for(let i=0;i<localStorage.length;i++){
+      const key=localStorage.key(i)||'';
+      if(!key.startsWith(FORM_SNAPSHOT_PREFIX))continue;
+      try{
+        const e=JSON.parse(localStorage.getItem(key));
+        if(e?.date&&!localMap.has(e.date))localMap.set(e.date,e);
+      }catch(e){}
+    }
+
+    const cloudEntries=await fetchAllCloudEntries();
+    const cloudMap=new Map(cloudEntries.map(e=>[e.date,e]));
+    const dates=new Set([...localMap.keys(),...cloudMap.keys()]);
+
+    for(const date of dates){
+      const local=localMap.get(date);
+      const cloud=cloudMap.get(date);
+
+      if(local&&!cloud){
+        await cloudUpsertEntry(local,true);
+      }else if(cloud&&!local){
+        await writeLocalEntry(cloud);
+      }else if(local&&cloud){
+        const localTime=localEntryTimestamp(local);
+        const cloudTime=localEntryTimestamp(cloud);
+        if(localTime>cloudTime){
+          await cloudUpsertEntry(local,true);
+        }else{
+          await writeLocalEntry(cloud);
+        }
+      }
+    }
+
+    setCloudStatus('Cloud synced','ok');
+    await restoreVisibleDay(true);
+    try{renderHistory();}catch(e){}
+    try{rebuildGameFromHistory();}catch(e){}
+  }catch(error){
+    console.warn('Cloud migration/sync failed',error);
+    setCloudStatus('Local mode • cloud retry','warn');
+  }finally{
+    cloudSyncBusy=false;
+  }
+}
+
+async function initializeSupabase(){
+  if(!window.supabase?.createClient){
+    document.getElementById('authStatus').textContent='Could not load secure login. Refresh the page.';
+    return false;
+  }
+
+  sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{
+    auth:{
+      persistSession:true,
+      autoRefreshToken:true,
+      detectSessionInUrl:true
+    }
+  });
+
+  const {data,error}=await sb.auth.getSession();
+  if(error)console.warn('Session read failed',error);
+
+  const user=data?.session?.user||null;
+  if(user){
+    cloudReady=true;
+    showAuthenticatedUI(user);
+    setCloudStatus('Cloud connected','ok');
+  }else{
+    showSignedOutUI();
+  }
+
+  sb.auth.onAuthStateChange((event,session)=>{
+    const nextUser=session?.user||null;
+    if(nextUser){
+      cloudReady=true;
+      showAuthenticatedUI(nextUser);
+      setCloudStatus('Cloud connected','ok');
+      if(!trackerBooted){
+        setTimeout(()=>location.reload(),150);
+      }else{
+        setTimeout(()=>migrateAndMergeCloud(),50);
+      }
+    }else{
+      showSignedOutUI();
+    }
+  });
+
+  return !!user;
+}
+
+
+async function init(){
+  const signedIn=await initializeSupabase();
+  if(!signedIn){
+    // Keep the tracker protected behind the login gate.
+    return;
+  }
+
+  const today=todayISO();
+
+  // Build and show the web app immediately.
+  appDataLoaded=false;
+  setTimeout(ensureCoffeeQuickAddDefaults,0);
+  buildMeals();
+  bindQuickChoices();
+
   const dateField=document.getElementById('entryDate');
+  if(dateField) dateField.value=today;
+  updateTopDate();
+
   if(dateField){
-    dateField.value=todayISO();
     dateField.addEventListener('change',async e=>{
-      try{await loadDate(e.target.value);}catch(error){console.warn('Date load failed',error);}
+      const selected=e.target.value;
+      const restored=restoreLocalFirst(selected);
+      if(!restored) resetBlankDayForDate(selected);
+      finishAppRestore();
+      restoreVisibleDay(true);
     });
   }
 
-  try{updateTopDate();}catch(error){}
-
-  try{
-    await loadDate(todayISO());
-  }catch(error){
-    console.warn('Initial day load failed',error);
-    appDataLoaded=true;
-    try{resetBlankDayForDate(todayISO());}catch(e){}
-    try{finishAppRestore();}catch(e){}
+  // Restore the fast synchronous browser copy first.
+  const restored=restoreLocalFirst(today);
+  if(!restored){
+    resetBlankDayForDate(today);
   }
+  currentLoadedDate=today;
+  finishAppRestore();
 
-  try{await updateStorageInfo();}catch(error){}
-  try{applySettings();}catch(error){}
+  // Health-return URL should be processed immediately, not after database startup.
+  try{importHealthFromURL();}catch(error){console.warn('Health URL import failed',error);}
+
+  applySettings();
 
   if(!localStorage.getItem('glp1Settings') || !localStorage.getItem('glp1SetupV6')){
-    try{openSetup();}catch(error){}
+    openSetup();
     localStorage.setItem('glp1SetupV6','shown');
   }
 
-  // Web version only: register the service worker but do NOT force reload.
-  if('serviceWorker' in navigator){
-    try{
-      await navigator.serviceWorker.register('service-worker.js',{updateViaCache:'none'});
-    }catch(error){
-      console.warn('Service worker registration failed',error);
-    }
+  // IndexedDB is now a background enhancement, never a startup blocker.
+  try{
+    await withTimeout(openDB(),2000);
+    await migrateAndMergeCloud();
+    await restoreVisibleDay(true);
+    updateStorageInfo();
+  }catch(error){
+    console.warn('Database startup skipped; local browser storage remains active',error);
   }
 
-  // Apply Health values only when this page was actually opened with import parameters.
-  try{
-    const params=new URLSearchParams(location.search);
-    if(params.get('healthImport')==='1'){
-      importHealthFromURL();
-    }
-  }catch(error){
-    console.warn('Health import startup check failed',error);
+  // Update the service worker in the background.
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('service-worker.js',{updateViaCache:'none'})
+      .then(registration=>{
+        registration.update().catch(()=>{});
+        if(registration.waiting){
+          registration.waiting.postMessage({type:'SKIP_WAITING'});
+        }
+      })
+      .catch(error=>console.warn('Service worker registration failed',error));
   }
 }
 init();
@@ -3080,6 +3555,6 @@ init();
   </div>
 </div>
 
-<div class="app-version-badge">v18.5</div>
+<div class="app-version-badge">v19.0</div>
 </body>
 </html>
