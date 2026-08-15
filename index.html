@@ -515,13 +515,8 @@ body.app-restoring .screen,body.app-restoring .bottom-nav{visibility:hidden}
 
 </style>
 </head>
-<body class="app-restoring">
-<div id="appLoadingMask" class="app-loading-mask">
-  <div class="app-loading-card">
-    <img src="avatar.png" alt="" class="app-loading-avatar">
-    <h2 class="app-loading-title">Loading today’s quest…</h2>
-    <div class="app-loading-text">Restoring your saved tracker data</div>
-  </div>
+<body>
+
 </div>
 <div class="app">
   <div class="topbar">
@@ -1711,15 +1706,15 @@ let lastSuccessfulRestore='';
 function finishAppRestore(){
   appDataLoaded=true;
   document.body.classList.remove('app-restoring');
-  const mask=document.getElementById('appLoadingMask');
-  if(mask){mask.classList.add('hidden');setTimeout(()=>mask.remove(),260);}
-  syncQuickChoices();
-  updateSleepScore();
-  updateDoseDayFields();
-  updateCompletion();
-  renderGameLayer();
-  rebuildGameFromHistory();
-  setTimeout(()=>{updateCompletion();renderGameLayer();},100);
+  try{syncQuickChoices();}catch(error){console.warn(error);}
+  try{updateSleepScore();}catch(error){console.warn(error);}
+  try{updateDoseDayFields();}catch(error){console.warn(error);}
+  try{updateCompletion();}catch(error){console.warn(error);}
+  try{renderGameLayer();}catch(error){console.warn(error);}
+  try{rebuildGameFromHistory();}catch(error){console.warn(error);}
+  setTimeout(()=>{
+    try{updateCompletion();renderGameLayer();}catch(error){}
+  },100);
 }
 
 async function restoreVisibleDay(force=false){
@@ -1733,7 +1728,6 @@ async function restoreVisibleDay(force=false){
   }
 
   restoreInProgress=true;
-  document.body.classList.add('app-restoring');
   try{
     await loadDate(selectedDate);
     lastSuccessfulRestore=selectedDate;
@@ -2286,16 +2280,7 @@ window.clearAllData=async function(){
 
 
 window.runHealthShortcut=function(){
-  const shortcutURL='shortcuts://run-shortcut?name=GLP-1%20Health%20Import';
-
-  // Web-only workflow: launch Shortcuts immediately.
-  // Do not save, show a loading mask, read the clipboard, or perform any async work first.
-  try{
-    window.location.href=shortcutURL;
-  }catch(error){
-    console.error('Shortcut launch failed',error);
-    alert('Could not open the GLP-1 Health Import Shortcut.');
-  }
+  window.location.href='shortcuts://run-shortcut?name=GLP-1%20Health%20Import';
 }
 
 window.showHealthImportHelp=function(){
@@ -3012,56 +2997,65 @@ window.addEventListener('pagehide',()=>{
   }
 });
 
-let serviceWorkerReloaded=false;
-if('serviceWorker' in navigator){
-  navigator.serviceWorker.addEventListener('controllerchange',()=>{
-    if(serviceWorkerReloaded) return;
-    serviceWorkerReloaded=true;
-    location.reload();
-  });
-}
 
 async function init(){
   appDataLoaded=false;
-  document.body.classList.add('app-restoring');
-  setTimeout(ensureCoffeeQuickAddDefaults,0);
-  buildMeals();
-  bindQuickChoices();
-  await openDB();
-  document.getElementById('entryDate').value=todayISO();
-  updateTopDate();
-  document.getElementById('entryDate').addEventListener('change',async e=>await loadDate(e.target.value));
-  await loadDate(todayISO());
-  await updateStorageInfo();
-  currentLoadedDate=document.getElementById('entryDate').value;
-  applySettings();
+
+  try{setTimeout(ensureCoffeeQuickAddDefaults,0);}catch(error){}
+  try{buildMeals();}catch(error){console.warn('buildMeals failed',error);}
+  try{bindQuickChoices();}catch(error){console.warn('bindQuickChoices failed',error);}
+
+  try{
+    await openDB();
+  }catch(error){
+    console.warn('IndexedDB open failed',error);
+  }
+
+  const dateField=document.getElementById('entryDate');
+  if(dateField){
+    dateField.value=todayISO();
+    dateField.addEventListener('change',async e=>{
+      try{await loadDate(e.target.value);}catch(error){console.warn('Date load failed',error);}
+    });
+  }
+
+  try{updateTopDate();}catch(error){}
+
+  try{
+    await loadDate(todayISO());
+  }catch(error){
+    console.warn('Initial day load failed',error);
+    appDataLoaded=true;
+    try{resetBlankDayForDate(todayISO());}catch(e){}
+    try{finishAppRestore();}catch(e){}
+  }
+
+  try{await updateStorageInfo();}catch(error){}
+  try{applySettings();}catch(error){}
+
   if(!localStorage.getItem('glp1Settings') || !localStorage.getItem('glp1SetupV6')){
-    openSetup();
+    try{openSetup();}catch(error){}
     localStorage.setItem('glp1SetupV6','shown');
   }
+
+  // Web version only: register the service worker but do NOT force reload.
   if('serviceWorker' in navigator){
     try{
-      const registration=await navigator.serviceWorker.register('service-worker.js',{updateViaCache:'none'});
-      registration.update().catch(()=>{});
-
-      if(registration.waiting){
-        registration.waiting.postMessage({type:'SKIP_WAITING'});
-      }
-
-      registration.addEventListener('updatefound',()=>{
-        const worker=registration.installing;
-        if(!worker) return;
-        worker.addEventListener('statechange',()=>{
-          if(worker.state==='installed' && navigator.serviceWorker.controller){
-            worker.postMessage({type:'SKIP_WAITING'});
-          }
-        });
-      });
+      await navigator.serviceWorker.register('service-worker.js',{updateViaCache:'none'});
     }catch(error){
       console.warn('Service worker registration failed',error);
     }
   }
-  importHealthFromURL();
+
+  // Apply Health values only when this page was actually opened with import parameters.
+  try{
+    const params=new URLSearchParams(location.search);
+    if(params.get('healthImport')==='1'){
+      importHealthFromURL();
+    }
+  }catch(error){
+    console.warn('Health import startup check failed',error);
+  }
 }
 init();
 </script>
@@ -3086,6 +3080,6 @@ init();
   </div>
 </div>
 
-<div class="app-version-badge">v18.4</div>
+<div class="app-version-badge">v18.5</div>
 </body>
 </html>
