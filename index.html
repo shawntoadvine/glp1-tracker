@@ -524,7 +524,7 @@ body.app-restoring .screen,body.app-restoring .bottom-nav{visibility:visible}
   padding:24px;
   background:linear-gradient(180deg,#eaf4ff,#f8fbff);
 }
-.auth-gate.hidden{display:none}
+.auth-gate.hidden{display:none !important;pointer-events:none !important;visibility:hidden !important}
 .auth-card{
   width:min(430px,100%);
   background:#fff;
@@ -618,6 +618,10 @@ body.app-restoring .screen,body.app-restoring .bottom-nav{visibility:visible}
   font-weight:800;
 }
 
+
+.bottom-nav{pointer-events:auto !important}
+.nav-btn{pointer-events:auto !important;touch-action:manipulation;cursor:pointer}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -638,7 +642,10 @@ body.app-restoring .screen,body.app-restoring .bottom-nav{visibility:visible}
     <span id="signedInEmail"></span>
     <span id="cloudSyncStatus" class="cloud-pill">Cloud starting…</span>
   </div>
-  <button type="button" onclick="signOutTracker()">Sign out</button>
+  <div style="display:flex;gap:6px;align-items:center">
+    <button type="button" onclick="manualRecoverData()">Recover Data</button>
+    <button type="button" onclick="signOutTracker()">Sign out</button>
+  </div>
 </div>
 <div class="app">
   <div class="topbar">
@@ -1044,11 +1051,11 @@ Injection and dose fields are hidden because this is not your scheduled dose day
 <div class="undo-toast" id="undoToast"><span id="undoText">Water added</span><button onclick="undoLastAction()">Undo</button></div>
 
 <div class="bottom-nav">
-  <button class="nav-btn active" data-screen="today"><span class="icon">🏠</span>Today</button>
-  <button class="nav-btn" data-screen="meals"><span class="icon">🍽️</span>Meals</button>
-  <button class="nav-btn" data-screen="symptoms"><span class="icon">❤️</span>Check-In</button>
-  <button class="nav-btn" data-screen="activity"><span class="icon">🏃</span>Activity</button>
-  <button class="nav-btn" data-screen="history"><span class="icon">📅</span>History</button>
+  <button type="button" class="nav-btn active" data-screen="today" onclick="switchScreen('today')"><span class="icon">🏠</span>Today</button>
+  <button type="button" class="nav-btn" data-screen="meals" onclick="switchScreen('meals')"><span class="icon">🍽️</span>Meals</button>
+  <button type="button" class="nav-btn" data-screen="symptoms" onclick="switchScreen('symptoms')"><span class="icon">❤️</span>Check-In</button>
+  <button type="button" class="nav-btn" data-screen="activity" onclick="switchScreen('activity')"><span class="icon">🏃</span>Activity</button>
+  <button type="button" class="nav-btn" data-screen="history" onclick="switchScreen('history')"><span class="icon">📅</span>History</button>
 </div>
 
 <div class="save-banner" id="saveBanner">Saved</div>
@@ -1910,40 +1917,40 @@ function resetBlankDayForDate(date){
 async function loadDate(date){
   appDataLoaded=false;
   const requestedDate=String(date||todayISO());
-  let entry=null;
 
-  // Authenticated cloud copy is authoritative when available.
-  if(cloudReady && cloudUser){
-    try{entry=await fetchCloudEntry(requestedDate);}catch(error){}
+  let local=null;
+  let cloud=null;
+
+  try{local=await getEntry(requestedDate);}catch(error){}
+  local=mergeEntriesSafely(local,getFormSnapshot(requestedDate),requestedDate);
+  local=mergeEntriesSafely(local,getLocalDayBackup(requestedDate),requestedDate);
+
+  try{
+    const raw=localStorage.getItem('glp1LatestBackup');
+    const latest=raw?JSON.parse(raw):null;
+    if(latest && (latest.date||latest.entryDate)===requestedDate){
+      local=mergeEntriesSafely(local,latest,requestedDate);
+    }
+  }catch(error){}
+
+  if(cloudReady&&cloudUser){
+    try{cloud=await fetchCloudEntry(requestedDate);}catch(error){}
   }
 
-  // Offline/local fallback.
-  if(!entry){
-    try{entry=await getEntry(requestedDate);}catch(error){console.warn('IndexedDB load failed',error);}
-  }
-  if(!entry) entry=getFormSnapshot(requestedDate);
-  if(!entry) entry=getLocalDayBackup(requestedDate);
+  const entry=mergeEntriesSafely(local,cloud,requestedDate);
 
-  if(!entry){
-    try{
-      const raw=localStorage.getItem('glp1LatestBackup');
-      const latest=raw?JSON.parse(raw):null;
-      if(latest && latest.date===requestedDate) entry=latest;
-    }catch(error){}
-  }
-
-  if(entry && entry.date===requestedDate){
+  if(entry){
     populate(entry);
-    try{await putEntry(entry);}catch(error){}
-    try{saveLocalDayBackup(entry);}catch(error){}
-    try{localStorage.setItem(formSnapshotKey(requestedDate),JSON.stringify(entry));}catch(error){}
+    await writeLocalEntry(entry);
+    if(cloudReady&&cloudUser)cloudUpsertEntry(entry,true);
   }else{
     resetBlankDayForDate(requestedDate);
   }
 
   const dateField=document.getElementById('entryDate');
-  if(dateField) dateField.value=requestedDate;
+  if(dateField)dateField.value=requestedDate;
   currentLoadedDate=requestedDate;
+  lastSuccessfulRestore=requestedDate;
   finishAppRestore();
 }
 function clearFormNoConfirm(){
@@ -2353,7 +2360,7 @@ window.removeHistory=async function(date){
   renderHistory();
   rebuildGameFromHistory();
 }
-document.querySelectorAll('.nav-btn').forEach(b=>b.addEventListener('click',()=>switchScreen(b.dataset.screen)));
+
 
 function download(name,content,type){const a=document.createElement('a'),u=URL.createObjectURL(new Blob([content],{type}));a.href=u;a.download=name;a.click();URL.revokeObjectURL(u)}
 window.exportJSON=async function(){download('glp1_tracker_backup.json',JSON.stringify(await getAll(),null,2),'application/json')}
@@ -3202,7 +3209,13 @@ function setCloudStatus(text,state=''){
 
 function showAuthenticatedUI(user){
   cloudUser=user||null;
-  document.getElementById('authGate')?.classList.add('hidden');
+  const gate=document.getElementById('authGate');
+  if(gate){
+    gate.classList.add('hidden');
+    gate.style.display='none';
+    gate.style.pointerEvents='none';
+    gate.setAttribute('aria-hidden','true');
+  }
   const strip=document.getElementById('accountStrip');
   if(strip)strip.style.display='flex';
   const email=document.getElementById('signedInEmail');
@@ -3214,7 +3227,13 @@ function showSignedOutUI(){
   cloudReady=false;
   const strip=document.getElementById('accountStrip');
   if(strip)strip.style.display='none';
-  document.getElementById('authGate')?.classList.remove('hidden');
+  const gate=document.getElementById('authGate');
+  if(gate){
+    gate.classList.remove('hidden');
+    gate.style.display='flex';
+    gate.style.pointerEvents='auto';
+    gate.removeAttribute('aria-hidden');
+  }
 }
 
 async function sendMagicLink(){
@@ -3240,6 +3259,21 @@ async function sendMagicLink(){
     return;
   }
   if(status)status.textContent='Check your email and tap the sign-in link. You can close this message after that.';
+}
+
+
+async function manualRecoverData(){
+  if(!cloudReady||!cloudUser){
+    alert('Sign in first.');
+    return;
+  }
+  const count=await recoverAndProtectHistory();
+  const today=todayISO();
+  const dateField=document.getElementById('entryDate');
+  if(dateField)dateField.value=today;
+  await loadDate(today);
+  try{await renderHistory();}catch(error){}
+  alert(`Recovery complete. ${count||0} saved day(s) were found and protected.`);
 }
 
 async function signOutTracker(){
@@ -3351,58 +3385,169 @@ async function writeLocalEntry(entry){
   try{await putEntry(entry);}catch(e){}
 }
 
+
+function meaningfulValue(value){
+  if(value===undefined||value===null)return false;
+  if(typeof value==='string')return value.trim()!=='' && value.trim()!=='0';
+  if(typeof value==='number')return value!==0;
+  if(typeof value==='boolean')return value;
+  if(Array.isArray(value))return value.length>0;
+  if(typeof value==='object')return Object.keys(value).length>0;
+  return true;
+}
+
+function recordRichness(entry){
+  if(!entry||typeof entry!=='object')return 0;
+  let score=0;
+  Object.entries(entry).forEach(([key,value])=>{
+    if(key==='date'||key==='entryDate'||key==='cloudUpdatedAt'||key==='modifiedAt')return;
+    if(key==='meals'&&value&&typeof value==='object'){
+      Object.values(value).forEach(meal=>{
+        if(meal&&typeof meal==='object'){
+          Object.values(meal).forEach(v=>{if(meaningfulValue(v))score+=2;});
+        }
+      });
+    }else if(meaningfulValue(value)){
+      score+=1;
+    }
+  });
+  return score;
+}
+
+function mergeObjectsKeepData(primary,secondary){
+  const result=JSON.parse(JSON.stringify(primary||{}));
+  const other=secondary||{};
+
+  Object.entries(other).forEach(([key,value])=>{
+    if(key==='date'||key==='entryDate')return;
+
+    const current=result[key];
+
+    if(value && typeof value==='object' && !Array.isArray(value)){
+      if(!current || typeof current!=='object' || Array.isArray(current)){
+        if(meaningfulValue(value))result[key]=JSON.parse(JSON.stringify(value));
+      }else{
+        result[key]=mergeObjectsKeepData(current,value);
+      }
+      return;
+    }
+
+    if(Array.isArray(value)){
+      if((!Array.isArray(current)||current.length===0) && value.length){
+        result[key]=JSON.parse(JSON.stringify(value));
+      }
+      return;
+    }
+
+    if(!meaningfulValue(current) && meaningfulValue(value)){
+      result[key]=value;
+    }
+  });
+
+  return result;
+}
+
+function mergeEntriesSafely(a,b,date){
+  if(!a&&!b)return null;
+  if(!a)return {...b,date,entryDate:date};
+  if(!b)return {...a,date,entryDate:date};
+
+  // Start with the richer record, then fill any blanks from the other record.
+  const aScore=recordRichness(a);
+  const bScore=recordRichness(b);
+  const primary=aScore>=bScore?a:b;
+  const secondary=aScore>=bScore?b:a;
+  const merged=mergeObjectsKeepData(primary,secondary);
+  merged.date=date;
+  merged.entryDate=date;
+  return merged;
+}
+
+async function collectEveryLocalRecord(){
+  const map=new Map();
+
+  // IndexedDB
+  try{
+    const rows=await getAll();
+    (rows||[]).forEach(entry=>{
+      const date=entry?.date||entry?.entryDate;
+      if(date)map.set(date,mergeEntriesSafely(map.get(date),entry,date));
+    });
+  }catch(error){
+    console.warn('IndexedDB recovery scan failed',error);
+  }
+
+  // Every localStorage backup format used by earlier versions.
+  for(let i=0;i<localStorage.length;i++){
+    const key=localStorage.key(i)||'';
+    if(
+      !key.startsWith(FORM_SNAPSHOT_PREFIX) &&
+      !key.startsWith(LOCAL_DAY_PREFIX) &&
+      key!=='glp1LatestBackup'
+    ) continue;
+
+    try{
+      const entry=JSON.parse(localStorage.getItem(key));
+      const date=entry?.date||entry?.entryDate;
+      if(date)map.set(date,mergeEntriesSafely(map.get(date),entry,date));
+    }catch(error){}
+  }
+
+  return map;
+}
+
+async function recoverAndProtectHistory(){
+  if(!cloudReady||!cloudUser)return;
+
+  setCloudStatus('Recovering saved history…','warn');
+
+  const localMap=await collectEveryLocalRecord();
+  const cloudEntries=await fetchAllCloudEntries();
+  const cloudMap=new Map();
+
+  (cloudEntries||[]).forEach(entry=>{
+    const date=entry?.date||entry?.entryDate;
+    if(date)cloudMap.set(date,mergeEntriesSafely(cloudMap.get(date),entry,date));
+  });
+
+  const dates=new Set([...localMap.keys(),...cloudMap.keys()]);
+  let recovered=0;
+
+  for(const date of [...dates].sort()){
+    // Never blindly let cloud overwrite the browser copy.
+    const merged=mergeEntriesSafely(localMap.get(date),cloudMap.get(date),date);
+    if(!merged)continue;
+
+    await writeLocalEntry(merged);
+    await cloudUpsertEntry(merged,true);
+    recovered++;
+  }
+
+  localStorage.setItem('glp1RecoveryLastRun',new Date().toISOString());
+  localStorage.setItem('glp1RecoveryRecordCount',String(recovered));
+  setCloudStatus(`Cloud synced • ${recovered} days found`,'ok');
+
+  return recovered;
+}
+
 async function migrateAndMergeCloud(){
   if(cloudSyncBusy||!cloudReady||!cloudUser)return;
   cloudSyncBusy=true;
-  setCloudStatus('Syncing history…');
 
   try{
-    let localEntries=[];
-    try{localEntries=await getAll();}catch(e){}
+    await recoverAndProtectHistory();
 
-    // Include localStorage-only current records if IndexedDB missed them.
-    const localMap=new Map();
-    (localEntries||[]).forEach(e=>{if(e?.date)localMap.set(e.date,e);});
+    // Always return the visible tracker to today's date after migration.
+    const today=todayISO();
+    const dateField=document.getElementById('entryDate');
+    if(dateField)dateField.value=today;
+    await loadDate(today);
 
-    for(let i=0;i<localStorage.length;i++){
-      const key=localStorage.key(i)||'';
-      if(!key.startsWith(FORM_SNAPSHOT_PREFIX))continue;
-      try{
-        const e=JSON.parse(localStorage.getItem(key));
-        if(e?.date&&!localMap.has(e.date))localMap.set(e.date,e);
-      }catch(e){}
-    }
-
-    const cloudEntries=await fetchAllCloudEntries();
-    const cloudMap=new Map(cloudEntries.map(e=>[e.date,e]));
-    const dates=new Set([...localMap.keys(),...cloudMap.keys()]);
-
-    for(const date of dates){
-      const local=localMap.get(date);
-      const cloud=cloudMap.get(date);
-
-      if(local&&!cloud){
-        await cloudUpsertEntry(local,true);
-      }else if(cloud&&!local){
-        await writeLocalEntry(cloud);
-      }else if(local&&cloud){
-        const localTime=localEntryTimestamp(local);
-        const cloudTime=localEntryTimestamp(cloud);
-        if(localTime>cloudTime){
-          await cloudUpsertEntry(local,true);
-        }else{
-          await writeLocalEntry(cloud);
-        }
-      }
-    }
-
-    setCloudStatus('Cloud synced','ok');
-    await restoreVisibleDay(true);
-    try{renderHistory();}catch(e){}
-    try{rebuildGameFromHistory();}catch(e){}
+    try{renderHistory();}catch(error){}
+    try{rebuildGameFromHistory();}catch(error){}
   }catch(error){
-    console.warn('Cloud migration/sync failed',error);
-    setCloudStatus('Local mode • cloud retry','warn');
+    console.warn('Recovery/cloud sync failed',error);
+    setCloudStatus('Saved locally • cloud retry','warn');
   }finally{
     cloudSyncBusy=false;
   }
@@ -3564,6 +3709,6 @@ init();
   </div>
 </div>
 
-<div class="app-version-badge">v19.1</div>
+<div class="app-version-badge">v19.2</div>
 </body>
 </html>
