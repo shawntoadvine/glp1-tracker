@@ -1,4 +1,4 @@
-const CACHE='glp1-tracker-v19-6-game-startup-sync';
+const CACHE='glp1-tracker-v19-7-safe-health-restore';
 const ASSETS=[
   './',
   './index.html',

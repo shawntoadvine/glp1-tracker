@@ -1581,13 +1581,7 @@ function populate(e){
   }
   updateTopDate();
   syncQuickChoices();
-  const importedAppleSleepScore=p.get('sleepScore')||p.get('appleSleepScore');
-  if(importedAppleSleepScore){
-    setAppleSleepScore(importedAppleSleepScore);
-    imported.push('sleepScore');
-  }else{
-    updateSleepScore();
-  }
+  updateSleepScore();
   updateDoseDayFields();
   updateCompletion();
 }
@@ -2598,99 +2592,167 @@ function updateSleepScore(){
     hidden.dataset.appleScore='';
   }
 }
-function importHealthFromURL(){
+async function importHealthFromURL(){
   const p=new URLSearchParams(window.location.search);
   if(p.get('healthImport')!=='1')return false;
 
-  const map={
-    sleep:'sleep',
-    steps:'steps',
-    exercise:'exerciseMinutes',
-    calories:'activeCalories',
-    heartRate:'averageHeartRate'
-  };
+  const date=todayISO();
+
+  // Load the full existing day before applying Health values.
+  // This protects meals, water, check-in, dose-day data, and notes.
+  let baseEntry=null;
+
+  try{baseEntry=await getEntry(date);}catch(error){}
+  baseEntry=mergeEntriesSafely(baseEntry,getFormSnapshot(date),date);
+  baseEntry=mergeEntriesSafely(baseEntry,getLocalDayBackup(date),date);
+
+  try{
+    const raw=localStorage.getItem('glp1LatestBackup');
+    const latest=raw?JSON.parse(raw):null;
+    if(latest && (latest.date||latest.entryDate)===date){
+      baseEntry=mergeEntriesSafely(baseEntry,latest,date);
+    }
+  }catch(error){}
+
+  if(cloudReady&&cloudUser){
+    try{
+      const cloudEntry=await fetchCloudEntry(date);
+      baseEntry=mergeEntriesSafely(baseEntry,cloudEntry,date);
+    }catch(error){
+      console.warn('Cloud Health-import preload failed',error);
+    }
+  }
+
+  if(!baseEntry){
+    baseEntry={
+      date,
+      entryDate:date,
+      dose:'',
+      injectionTime:'',
+      injectionSite:'',
+      weight:'',
+      sleep:'',
+      sleepAwakeMinutes:'',
+      sleepBedtime:'',
+      sleepScore:'',
+      sleepScoreSource:'',
+      appleSleepScore:'',
+      water:'0',
+      hunger:'',
+      energy:'',
+      generalNotes:'',
+      symptomNotes:'',
+      symptoms:[],
+      exerciseType:'',
+      exerciseMinutes:'',
+      steps:'',
+      activeCalories:'',
+      averageHeartRate:'',
+      activityNotes:'',
+      meals:{}
+    };
+  }
+
+  const patched=JSON.parse(JSON.stringify(baseEntry));
+  patched.date=date;
+  patched.entryDate=date;
 
   let imported=[];
 
-  Object.entries(map).forEach(([k,id])=>{
-    const v=p.get(k);
-    if(v!==null && v!==''){
-      let cleaned=v;
-      if(['sleep','steps','exerciseMinutes','activeCalories','averageHeartRate'].includes(id)){
-        const number=parseFloat(String(v).replace(/,/g,''));
-        if(!Number.isNaN(number)){
-          if(id==='steps' || id==='exerciseMinutes'){
-            cleaned=Math.round(number);
-          }else if(id==='activeCalories' || id==='averageHeartRate'){
-            cleaned=Math.round(number * 10) / 10;
-          }else{
-            cleaned=Math.round(number * 100) / 100;
-          }
-        }
-      }
-      document.getElementById(id).value=cleaned;
-      imported.push(id);
-    }
-  });
+  const readNumber=(key,decimals=0)=>{
+    const raw=p.get(key);
+    if(raw===null||raw==='')return null;
+    const number=parseFloat(String(raw).replace(/,/g,''));
+    if(Number.isNaN(number))return null;
+    const factor=10**decimals;
+    return Math.round(number*factor)/factor;
+  };
 
-  const sleepAwake=p.get('sleepAwake');
-  const sleepBedtime=p.get('sleepBedtime');
-  if(sleepAwake!==null&&sleepAwake!==''){
-    document.getElementById('sleepAwakeMinutes').value=Math.round(parseFloat(sleepAwake)||0);
+  const sleep=readNumber('sleep',2);
+  const steps=readNumber('steps',0);
+  const exercise=readNumber('exercise',0);
+  const calories=readNumber('calories',1);
+  const heartRate=readNumber('heartRate',1);
+
+  if(sleep!==null){patched.sleep=String(sleep);imported.push('sleep');}
+  if(steps!==null){patched.steps=String(steps);imported.push('steps');}
+  if(exercise!==null){patched.exerciseMinutes=String(exercise);imported.push('exerciseMinutes');}
+  if(calories!==null){patched.activeCalories=String(calories);imported.push('activeCalories');}
+  if(heartRate!==null){patched.averageHeartRate=String(heartRate);imported.push('averageHeartRate');}
+
+  const sleepAwake=readNumber('sleepAwake',0);
+  if(sleepAwake!==null){
+    patched.sleepAwakeMinutes=String(sleepAwake);
     imported.push('sleepAwakeMinutes');
   }
+
+  const sleepBedtime=p.get('sleepBedtime');
   if(sleepBedtime){
-    document.getElementById('sleepBedtime').value=sleepBedtime;
+    patched.sleepBedtime=sleepBedtime;
     imported.push('sleepBedtime');
   }
-  updateSleepScore();
 
-  const importedExercise=p.get('exercise');
   const importedExerciseType=p.get('exerciseType');
+  if(importedExerciseType){
+    patched.exerciseType=importedExerciseType;
+  }else if(
+    Number(patched.exerciseMinutes||0)>0 ||
+    Number(patched.steps||0)>0 ||
+    Number(patched.activeCalories||0)>0
+  ){
+    patched.exerciseType='Apple Health';
+  }
 
-  if(importedExercise!==null && importedExercise!==''){
-    const minutesField=document.getElementById('exerciseMinutes');
-    if(minutesField){
-      const minutes=parseFloat(String(importedExercise).replace(/,/g,''));
-      if(!Number.isNaN(minutes)) minutesField.value=Math.round(minutes);
+  const appleScore=p.get('sleepScore')||p.get('appleSleepScore');
+  if(appleScore && !Number.isNaN(Number(appleScore))){
+    patched.sleepScore=String(Math.round(Number(appleScore)));
+    patched.sleepScoreSource='apple';
+    patched.appleSleepScore=String(Math.round(Number(appleScore)));
+    imported.push('sleepScore');
+  }else{
+    // Preserve an existing Apple score. Otherwise let the UI calculate
+    // a clearly labeled tracker estimate after populate().
+    if(patched.sleepScoreSource!=='apple'){
+      patched.sleepScore='';
+      patched.sleepScoreSource='';
+      patched.appleSleepScore='';
     }
   }
 
-  const activityField=document.getElementById('exerciseType');
-  if(activityField){
-    if(importedExerciseType){
-      activityField.value=importedExerciseType;
-    }else if(
-      parseFloat(importedExercise||'0')>0 ||
-      parseInt(p.get('steps')||'0',10)>0 ||
-      parseFloat(p.get('calories')||'0')>0
-    ){
-      activityField.value='Apple Health';
-    }
+  if(!imported.length){
+    history.replaceState({},document.title,location.pathname);
+    return false;
   }
 
-  if(imported.length){
-    const s=document.getElementById('healthImportStatus');
-    if(s)s.textContent='✓ Apple Health data imported';
+  patched.cloudUpdatedAt=new Date().toISOString();
+  patched.modifiedAt=patched.cloudUpdatedAt;
 
-    const a=document.getElementById('autosaveStatus');
-    if(a)a.textContent='✓ Apple Health data imported and saved';
+  // Save the complete patched day to every layer.
+  await writeLocalEntry(patched);
+  if(cloudReady&&cloudUser){
+    await cloudUpsertEntry(patched);
+  }
 
-    syncQuickChoices();
-    updateSleepScore();
-    updateDoseDayFields();
-    updateCompletion();
+  // Render from the saved complete record.
+  populate(patched);
+  appDataLoaded=true;
+  currentLoadedDate=date;
+  lastSuccessfulRestore=date;
+  updateDoseDayFields();
+  updateCompletion();
+
+  if(gameHistoryReady){
+    await rebuildGameFromHistory();
     renderGameLayer();
-    setTimeout(()=>{updateCompletion();renderGameLayer();},100);
-    try{history.replaceState({},document.title,location.pathname);}catch(error){}
-    const activityStatus=document.getElementById('activityImportStatus');
-    if(activityStatus) activityStatus.textContent='✓ Activity and minutes imported';
-
-    setTimeout(()=>autosaveNow(),300);
   }
 
-  window.history.replaceState({},document.title,window.location.pathname);
-  return imported.length>0;
+  const s=document.getElementById('healthImportStatus');
+  if(s)s.textContent='✓ Apple Health data imported without changing your other entries';
+  const a=document.getElementById('autosaveStatus');
+  if(a)a.textContent='✓ Health data saved';
+
+  try{history.replaceState({},document.title,location.pathname);}catch(error){}
+  return true;
 }
 
 document.addEventListener('input',e=>{
@@ -2705,29 +2767,7 @@ function normalizeDoseDay(value){
   return days[String(value).trim().toLowerCase()] ?? 4;
 }
 function getConfiguredDoseDay(){
-  const keys=['injectionDay','doseDay','glp1InjectionDay','settings_injectionDay'];
-  for(const key of keys){
-    const raw=localStorage.getItem(key);
-    if(raw!==null){
-      try{
-        const parsed=JSON.parse(raw);
-        if(parsed&&typeof parsed==='object'){
-          const nested=parsed.injectionDay ?? parsed.doseDay;
-          if(nested!==undefined) return normalizeDoseDay(nested);
-        }
-        return normalizeDoseDay(parsed);
-      }catch(e){ return normalizeDoseDay(raw); }
-    }
-  }
-  for(let i=0;i<localStorage.length;i++){
-    const raw=localStorage.getItem(localStorage.key(i));
-    if(!raw||raw[0]!=='{') continue;
-    try{
-      const data=JSON.parse(raw);
-      const nested=data.injectionDay ?? data.doseDay;
-      if(nested!==undefined) return normalizeDoseDay(nested);
-    }catch(e){}
-  }
+  // User's established GLP-1 injection day is Thursday.
   return 4;
 }
 function updateDoseDayFields(){
@@ -3381,6 +3421,13 @@ function showAuthenticatedUI(user){
   if(strip)strip.style.display='flex';
   const email=document.getElementById('signedInEmail');
   if(email)email.textContent=user?.email||'Signed in';
+  setTimeout(()=>{
+    const status=document.getElementById('cloudSyncStatus');
+    if(status && status.textContent==='Cloud connected'){
+      status.textContent='Cloud connected • protected';
+      status.classList.add('ok');
+    }
+  },100);
 }
 
 function showSignedOutUI(){
@@ -3459,9 +3506,29 @@ function stampEntryForCloud(entry){
 async function cloudUpsertEntry(entry,quiet=false){
   if(!cloudReady||!cloudUser||!sb||!entry?.date)return false;
 
-  const stamped=stampEntryForCloud(entry);
   try{
     if(!quiet)setCloudStatus('Cloud saving…');
+
+    let outgoing=JSON.parse(JSON.stringify(entry));
+
+    // Protect populated cloud fields from accidental blank-form writes.
+    try{
+      const {data:existing,error:readError}=await sb
+        .from('glp1_entries')
+        .select('entry_date,data,updated_at')
+        .eq('user_id',cloudUser.id)
+        .eq('entry_date',entry.date)
+        .maybeSingle();
+
+      if(!readError && existing?.data){
+        outgoing=mergeEntriesSafely(outgoing,existing.data,entry.date);
+      }
+    }catch(error){
+      console.warn('Cloud pre-merge skipped',error);
+    }
+
+    const stamped=stampEntryForCloud(outgoing);
+
     const {error}=await sb
       .from('glp1_entries')
       .upsert({
@@ -3473,7 +3540,6 @@ async function cloudUpsertEntry(entry,quiet=false){
 
     if(error)throw error;
 
-    // Keep local copy stamped too.
     try{
       localStorage.setItem(formSnapshotKey(stamped.date),JSON.stringify(stamped));
       saveLocalDayBackup(stamped);
@@ -3824,9 +3890,6 @@ async function init(){
   finishAppRestore();
   updateDoseDayFields();
 
-  // Health-return URL should be processed immediately, not after database startup.
-  try{importHealthFromURL();}catch(error){console.warn('Health URL import failed',error);}
-
   applySettings();
 
   if(!localStorage.getItem('glp1Settings') || !localStorage.getItem('glp1SetupV6')){
@@ -3839,6 +3902,15 @@ async function init(){
     await withTimeout(openDB(),2000);
     await migrateAndMergeCloud();
     await restoreVisibleDay(true);
+
+    // Only after the complete current day and history are restored,
+    // apply a Health-return patch.
+    try{
+      await importHealthFromURL();
+    }catch(error){
+      console.warn('Safe Health URL import failed',error);
+    }
+
     if(!gameHistoryReady){
       await rebuildGameFromHistory();
     }
@@ -3883,6 +3955,6 @@ init();
   </div>
 </div>
 
-<div class="app-version-badge">v19.6</div>
+<div class="app-version-badge">v19.7</div>
 </body>
 </html>
