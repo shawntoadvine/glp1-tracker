@@ -1,4 +1,4 @@
-const CACHE='glp1-tracker-v19-2-recovery-nav';
+const CACHE='glp1-tracker-v19-5-game-cloud-history';
 const ASSETS=[
   './',
   './index.html',

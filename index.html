@@ -1051,11 +1051,11 @@ Injection and dose fields are hidden because this is not your scheduled dose day
 <div class="undo-toast" id="undoToast"><span id="undoText">Water added</span><button onclick="undoLastAction()">Undo</button></div>
 
 <div class="bottom-nav">
-  <button type="button" class="nav-btn active" data-screen="today" onclick="switchScreen('today')"><span class="icon">🏠</span>Today</button>
-  <button type="button" class="nav-btn" data-screen="meals" onclick="switchScreen('meals')"><span class="icon">🍽️</span>Meals</button>
-  <button type="button" class="nav-btn" data-screen="symptoms" onclick="switchScreen('symptoms')"><span class="icon">❤️</span>Check-In</button>
-  <button type="button" class="nav-btn" data-screen="activity" onclick="switchScreen('activity')"><span class="icon">🏃</span>Activity</button>
-  <button type="button" class="nav-btn" data-screen="history" onclick="switchScreen('history')"><span class="icon">📅</span>History</button>
+  <button type="button" class="nav-btn active" data-screen="today"><span class="icon">🏠</span>Today</button>
+  <button type="button" class="nav-btn" data-screen="meals"><span class="icon">🍽️</span>Meals</button>
+  <button type="button" class="nav-btn" data-screen="symptoms"><span class="icon">❤️</span>Check-In</button>
+  <button type="button" class="nav-btn" data-screen="activity"><span class="icon">🏃</span>Activity</button>
+  <button type="button" class="nav-btn" data-screen="history"><span class="icon">📅</span>History</button>
 </div>
 
 <div class="save-banner" id="saveBanner">Saved</div>
@@ -2340,6 +2340,46 @@ async function renderHistory(){
       </div>
     </div>`).join('');
 }
+
+function switchScreen(id){
+  const validScreens=['today','meals','symptoms','activity','history'];
+  if(!validScreens.includes(id)) return;
+
+  document.querySelectorAll('.screen').forEach(screen=>{
+    screen.classList.toggle('active',screen.id===id);
+  });
+
+  document.querySelectorAll('.nav-btn').forEach(button=>{
+    button.classList.toggle('active',button.dataset.screen===id);
+  });
+
+  const title=document.getElementById('screenTitle');
+  if(title){
+    title.textContent={
+      today:'Today',
+      meals:'Meals',
+      symptoms:'Check-In',
+      activity:'Activity',
+      history:'History'
+    }[id];
+  }
+
+  if(id==='history'){
+    try{renderHistory();}catch(error){console.warn('History render failed',error);}
+    try{updateStorageInfo();}catch(error){}
+  }
+
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+
+document.addEventListener('click',event=>{
+  const button=event.target.closest?.('.nav-btn');
+  if(!button) return;
+  const screen=button.dataset.screen;
+  if(screen) switchScreen(screen);
+});
+
 window.loadHistory=async function(date){switchScreen('today');await loadDate(date)}
 window.removeHistory=async function(date){
   if(!confirm('Delete '+date+'?'))return;
@@ -2687,13 +2727,42 @@ function getConfiguredDoseDay(){
   return 4;
 }
 function updateDoseDayFields(){
-  const input=document.getElementById('entryDate');
-  if(!input||!input.value) return;
-  const selected=new Date(`${input.value}T12:00:00`);
-  const show=selected.getDay()===getConfiguredDoseDay();
-  document.querySelectorAll('.dose-day-only').forEach(el=>el.style.display=show?'':'none');
-  const note=document.getElementById('nonDoseDayNote');
-  if(note) note.style.display=show?'none':'block';
+  const dateValue=document.getElementById('entryDate')?.value||todayISO();
+  const selectedDate=new Date(`${dateValue}T12:00:00`);
+  const configuredDoseDay=getConfiguredDoseDay();
+  const isDoseDay=selectedDate.getDay()===configuredDoseDay;
+
+  const selectors=[
+    '#doseField',
+    '#injectionTimeField',
+    '#injectionSiteField',
+    '.dose-day-only'
+  ];
+
+  selectors.forEach(selector=>{
+    document.querySelectorAll(selector).forEach(el=>{
+      el.style.display=isDoseDay?'':'none';
+      el.hidden=!isDoseDay;
+    });
+  });
+
+  // Also hide/show the individual field wrappers in case an older layout
+  // does not use the dose-day-only class.
+  ['dose','injectionTime','injectionSite'].forEach(id=>{
+    const input=document.getElementById(id);
+    const wrapper=input?.closest('.field') || input?.parentElement;
+    if(wrapper){
+      wrapper.style.display=isDoseDay?'':'none';
+      wrapper.hidden=!isDoseDay;
+    }
+  });
+
+  // Dose quest only applies on the configured dose day.
+  const quest=document.getElementById('questDose');
+  if(quest){
+    quest.style.display=isDoseDay?'':'none';
+    quest.hidden=!isDoseDay;
+  }
 }
 document.addEventListener('change',e=>{
   if(e.target?.id==='entryDate'){ updateDoseDayFields(); updateCompletion(); }
@@ -2848,9 +2917,16 @@ function dateBefore(date){
 }
 
 function deriveGameStateFromEntries(entries){
-  const valid=(entries||[])
+  const byDate=new Map();
+
+  (entries||[])
     .filter(entry=>entry && (entry.date||entry.entryDate))
-    .map(entry=>({...entry,date:entry.date||entry.entryDate}))
+    .forEach(entry=>{
+      const date=entry.date||entry.entryDate;
+      byDate.set(date,mergeEntriesSafely(byDate.get(date),entry,date));
+    });
+
+  const valid=[...byDate.values()]
     .sort((a,b)=>a.date.localeCompare(b.date));
 
   let xp=0;
@@ -2860,13 +2936,23 @@ function deriveGameStateFromEntries(entries){
   valid.forEach(entry=>{
     const quests=applicableQuestsForEntry(entry);
     const completed=quests.filter(q=>q.done);
-    const earned=completed.reduce((sum,q)=>sum+q.xp,0);
+    let earned=completed.reduce((sum,q)=>sum+q.xp,0);
+
+    // Older recovered records may not match every new field name.
+    // A day that clearly contains tracker data still counts as a logged day
+    // and earns a small participation award rather than appearing nonexistent.
+    const hasHistoricalData=recordRichness(entry)>0;
+    if(hasHistoricalData && earned===0){
+      earned=20;
+    }
+
     const allDone=quests.length>0 && quests.every(q=>q.done);
 
-    if(earned>0){
+    if(hasHistoricalData){
       activeDates.push(entry.date);
       xp+=earned;
     }
+
     if(allDone){
       xp+=100;
       completedDates.push(entry.date);
@@ -2874,17 +2960,18 @@ function deriveGameStateFromEntries(entries){
   });
 
   const uniqueDates=[...new Set(activeDates)].sort();
+
   let longestStreak=0;
-  let currentStreak=0;
+  let running=0;
   let previous='';
 
   uniqueDates.forEach(date=>{
-    currentStreak=previous && dateBefore(date)===previous ? currentStreak+1 : 1;
-    longestStreak=Math.max(longestStreak,currentStreak);
+    running=previous && dateBefore(date)===previous ? running+1 : 1;
+    longestStreak=Math.max(longestStreak,running);
     previous=date;
   });
 
-  // Display the streak ending on the latest logged date.
+  // Current streak is the consecutive run ending on the most recent logged day.
   let streak=0;
   if(uniqueDates.length){
     streak=1;
@@ -2900,6 +2987,7 @@ function deriveGameStateFromEntries(entries){
     level:levelForXp(xp),
     streak,
     longestStreak,
+    historyDays:uniqueDates.length,
     lastQuestDate:uniqueDates.at(-1)||'',
     completedDates
   };
@@ -2913,10 +3001,53 @@ async function rebuildGameFromHistory(){
 
   gameHistoryRefreshInProgress=true;
   try{
-    const entries=await getAll();
+    const mergedMap=new Map();
+
+    // Pull every recoverable browser record, not just IndexedDB.
+    try{
+      const localMap=await collectEveryLocalRecord();
+      localMap.forEach((entry,date)=>{
+        mergedMap.set(date,mergeEntriesSafely(mergedMap.get(date),entry,date));
+      });
+    }catch(error){
+      console.warn('Local game history scan failed',error);
+      try{
+        const rows=await getAll();
+        (rows||[]).forEach(entry=>{
+          const date=entry?.date||entry?.entryDate;
+          if(date)mergedMap.set(date,mergeEntriesSafely(mergedMap.get(date),entry,date));
+        });
+      }catch(error2){}
+    }
+
+    // Pull Supabase history too so recovered/cloud-only days count immediately.
+    if(cloudReady&&cloudUser){
+      try{
+        const cloudEntries=await fetchAllCloudEntries();
+        (cloudEntries||[]).forEach(entry=>{
+          const date=entry?.date||entry?.entryDate;
+          if(date)mergedMap.set(date,mergeEntriesSafely(mergedMap.get(date),entry,date));
+        });
+      }catch(error){
+        console.warn('Cloud game history scan failed',error);
+      }
+    }
+
+    const entries=[...mergedMap.values()]
+      .filter(entry=>entry && (entry.date||entry.entryDate))
+      .sort((a,b)=>(a.date||a.entryDate).localeCompare(b.date||b.entryDate));
+
     const state=deriveGameStateFromEntries(entries);
+
+    // Track how many distinct history days the game is based on.
+    state.historyDays=entries.filter(entry=>recordRichness(entry)>0).length;
+
     saveGameState(state);
     updateGameStateDisplay(state);
+
+    const historyCountEl=document.getElementById('gameHistoryDays');
+    if(historyCountEl) historyCountEl.textContent=state.historyDays||0;
+
   }catch(error){
     console.warn('Game history rebuild failed',error);
   }finally{
@@ -2950,6 +3081,9 @@ function updateGameStateDisplay(state){
   const nextReward=Math.max(1,5-((state.streak||0)%5));
   const nextRewardEl=document.getElementById('nextRewardDays');
   if(nextRewardEl) nextRewardEl.textContent=nextReward;
+
+  const historyDaysEl=document.getElementById('gameHistoryDays');
+  if(historyDaysEl) historyDaysEl.textContent=state.historyDays||0;
 }
 
 function renderGameLayer(){
@@ -3527,6 +3661,9 @@ async function recoverAndProtectHistory(){
   localStorage.setItem('glp1RecoveryRecordCount',String(recovered));
   setCloudStatus(`Cloud synced • ${recovered} days found`,'ok');
 
+  // Rebuild game from the recovered local + cloud history.
+  setTimeout(()=>rebuildGameFromHistory(),0);
+
   return recovered;
 }
 
@@ -3642,6 +3779,7 @@ async function init(){
       const restored=restoreLocalFirst(selected);
       if(!restored) resetBlankDayForDate(selected);
       finishAppRestore();
+      updateDoseDayFields();
       restoreVisibleDay(true);
     });
   }
@@ -3653,6 +3791,7 @@ async function init(){
   }
   currentLoadedDate=today;
   finishAppRestore();
+  updateDoseDayFields();
 
   // Health-return URL should be processed immediately, not after database startup.
   try{importHealthFromURL();}catch(error){console.warn('Health URL import failed',error);}
@@ -3709,6 +3848,6 @@ init();
   </div>
 </div>
 
-<div class="app-version-badge">v19.2</div>
+<div class="app-version-badge">v19.5</div>
 </body>
 </html>
