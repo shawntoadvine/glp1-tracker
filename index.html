@@ -566,7 +566,7 @@ body.app-restoring .screen,body.app-restoring .bottom-nav{visibility:hidden}
     <div class="game-stats">
       <div class="game-stat"><strong id="gameSleep">—</strong><span>Sleep</span></div>
       <div class="game-stat"><strong id="gameWater">0</strong><span>Water</span></div>
-      <div class="game-stat"><strong id="gameSleepScore">—</strong><span>Sleep Score</span></div>
+      <div class="game-stat"><strong id="gameSleepScore">—</strong><span id="gameSleepScoreLabel">Sleep Score</span></div>
     </div>
 
     <button type="button" class="calorie-today-card" onclick="openCaloriesBreakdown()">
@@ -589,7 +589,7 @@ body.app-restoring .screen,body.app-restoring .bottom-nav{visibility:hidden}
       <div class="game-stat"><div style="font-size:1.7rem">💧</div><strong id="overviewWater">0 oz</strong><span>Water</span></div>
       <div class="game-stat"><div style="font-size:1.7rem">🍽️</div><strong id="overviewHunger">—</strong><span>Hunger Today</span></div>
       <div class="game-stat"><div style="font-size:1.7rem">⚡</div><strong id="overviewEnergy">—</strong><span>Energy</span></div>
-      <div class="game-stat"><div style="font-size:1.7rem">🛡️</div><strong id="overviewSleepScore">—</strong><span>Sleep Score</span></div>
+      <div class="game-stat"><div style="font-size:1.7rem">🛡️</div><strong id="overviewSleepScore">—</strong><span id="overviewSleepScoreLabel">Sleep Score</span></div>
       <div class="game-stat"><div style="font-size:1.7rem">🔥</div><strong id="overviewCalories">0</strong><span>Calories Today</span></div>
     </div>
   </div>
@@ -1400,7 +1400,10 @@ let lastCollectedMeals={};
 function collect(){
   const e={
     date:val('entryDate'), entryDate:val('entryDate'), dose:val('dose'), injectionTime:val('injectionTime'),
-    injectionSite:val('injectionSite'), weight:val('weight'), sleep:val('sleep'), sleepAwakeMinutes:val('sleepAwakeMinutes'), sleepBedtime:val('sleepBedtime'), sleepScore:val('sleepScore'), water:val('water'),
+    injectionSite:val('injectionSite'), weight:val('weight'), sleep:val('sleep'), sleepAwakeMinutes:val('sleepAwakeMinutes'), sleepBedtime:val('sleepBedtime'), sleepScore:val('sleepScore'),
+    sleepScoreSource:document.getElementById('sleepScore')?.dataset.scoreSource||'',
+    appleSleepScore:document.getElementById('sleepScore')?.dataset.appleScore||'',
+    water:val('water'),
     hunger:val('hunger'), energy:val('energy'), generalNotes:val('generalNotes'),
     symptomNotes:val('symptomNotes'), symptoms:checkedSymptoms(),
     exerciseType:val('exerciseType'), exerciseMinutes:val('exerciseMinutes'), steps:val('steps'), activeCalories:val('activeCalories'), averageHeartRate:val('averageHeartRate'),
@@ -1446,9 +1449,20 @@ function populate(e){
   lastCollectedMeals=JSON.parse(JSON.stringify(e.meals||{}));
   populateMealFields(e.meals||{});
   currentLoadedDate=e.date;
+  const sleepScoreEl=document.getElementById('sleepScore');
+  if(sleepScoreEl){
+    sleepScoreEl.dataset.scoreSource=e.sleepScoreSource||'';
+    sleepScoreEl.dataset.appleScore=e.appleSleepScore||'';
+  }
   updateTopDate();
   syncQuickChoices();
-  updateSleepScore();
+  const importedAppleSleepScore=p.get('sleepScore')||p.get('appleSleepScore');
+  if(importedAppleSleepScore){
+    setAppleSleepScore(importedAppleSleepScore);
+    imported.push('sleepScore');
+  }else{
+    updateSleepScore();
+  }
   updateDoseDayFields();
   updateCompletion();
 }
@@ -2304,6 +2318,25 @@ function previousBedtimes(){
     return values.slice(-14);
   }catch(e){return [];}
 }
+function setAppleSleepScore(value){
+  const scoreBox=document.getElementById('sleepScoreValue');
+  const label=document.getElementById('sleepScoreLabel');
+  const hidden=document.getElementById('sleepScore');
+  const score=Number(value);
+
+  if(!Number.isFinite(score) || score<=0 || score>100) return false;
+
+  const rounded=Math.round(score);
+  if(hidden){
+    hidden.value=rounded;
+    hidden.dataset.scoreSource='apple';
+    hidden.dataset.appleScore=String(rounded);
+  }
+  if(scoreBox)scoreBox.textContent=rounded;
+  if(label)label.textContent='Apple Sleep Score';
+  return true;
+}
+
 function updateSleepScore(){
   const hours=Number(document.getElementById('sleep')?.value);
   const awake=Number(document.getElementById('sleepAwakeMinutes')?.value);
@@ -2311,10 +2344,23 @@ function updateSleepScore(){
   const scoreBox=document.getElementById('sleepScoreValue');
   const label=document.getElementById('sleepScoreLabel');
   const hidden=document.getElementById('sleepScore');
+
+  const appleScore=Number(hidden?.dataset.appleScore||0);
+  if(hidden?.dataset.scoreSource==='apple' && appleScore>0){
+    if(scoreBox)scoreBox.textContent=Math.round(appleScore);
+    if(label)label.textContent='Apple Sleep Score';
+    hidden.value=Math.round(appleScore);
+    return;
+  }
+
   if(!scoreBox||!label||!Number.isFinite(hours)||hours<=0){
     if(scoreBox)scoreBox.textContent='—';
-    if(label)label.textContent='Waiting for Apple Health sleep data';
-    if(hidden)hidden.value='';
+    if(label)label.textContent='No sleep score available';
+    if(hidden){
+      hidden.value='';
+      hidden.dataset.scoreSource='';
+      hidden.dataset.appleScore='';
+    }
     return;
   }
 
@@ -2347,9 +2393,14 @@ function updateSleepScore(){
 
   const score=Math.round(clampSleepScore(duration+awakePts+consistency,0,100));
   const quality=score>=90?'Excellent':score>=80?'Very good':score>=70?'Good':score>=60?'Fair':'Needs attention';
+
   scoreBox.textContent=score;
-  label.textContent=`${quality} • ${hours.toFixed(1)} hours${Number.isFinite(awake)?` • ${Math.round(awake)} awake min`:''}${bedtime?` • bedtime ${bedtime}`:''}`;
-  if(hidden)hidden.value=score;
+  label.textContent=`Tracker Estimate • ${quality}`;
+  if(hidden){
+    hidden.value=score;
+    hidden.dataset.scoreSource='estimate';
+    hidden.dataset.appleScore='';
+  }
 }
 function importHealthFromURL(){
   const p=new URLSearchParams(window.location.search);
@@ -2773,6 +2824,9 @@ function renderGameLayer(){
   if(document.getElementById('gameSleep'))document.getElementById('gameSleep').textContent=sleep?`${sleep.toFixed(1)}h`:'—';
   if(document.getElementById('gameWater'))document.getElementById('gameWater').textContent=`${water*(settings.waterOz||12)} oz`;
   if(document.getElementById('gameSleepScore'))document.getElementById('gameSleepScore').textContent=score||'—';
+  const scoreSource=document.getElementById('sleepScore')?.dataset.scoreSource||'';
+  const gameScoreLabel=document.getElementById('gameSleepScoreLabel');
+  if(gameScoreLabel)gameScoreLabel.textContent=scoreSource==='apple'?'Apple Sleep Score':score?'Sleep Score Estimate':'Sleep Score';
   const caloriesTotal=caloriesTodayTotal();
   const caloriesEl=document.getElementById('gameCaloriesToday');
   if(caloriesEl)caloriesEl.textContent=Math.round(caloriesTotal).toLocaleString();
@@ -2819,6 +2873,9 @@ function renderVersion17Panels(){
     const el=document.getElementById(id);
     if(el)el.textContent=value;
   });
+  const overviewScoreSource=document.getElementById('sleepScore')?.dataset.scoreSource||'';
+  const overviewScoreLabel=document.getElementById('overviewSleepScoreLabel');
+  if(overviewScoreLabel)overviewScoreLabel.textContent=overviewScoreSource==='apple'?'Apple Sleep Score':sleepScore?'Sleep Score Estimate':'Sleep Score';
 
   const mealHolder=document.getElementById('gameMealsProgress');
   if(mealHolder){
@@ -3022,6 +3079,6 @@ init();
   </div>
 </div>
 
-<div class="app-version-badge">v18.2</div>
+<div class="app-version-badge">v18.3</div>
 </body>
 </html>
