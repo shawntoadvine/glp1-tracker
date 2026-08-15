@@ -835,6 +835,7 @@ Injection and dose fields are hidden because this is not your scheduled dose day
         <button class="btn primary" onclick="saveActivitySection()">Save Activity</button>
         <button class="btn secondary" onclick="runHealthShortcut()">Import from Apple Health</button><button class="btn secondary" onclick="showHealthImportHelp()">Shortcut Help</button>
       </div>
+<div class="tiny" style="margin-top:8px">Web version: this button should open Shortcuts immediately. When the Shortcut finishes, it should open this tracker URL with the Health data.</div>
       <div class="autosave-status" id="activitySaveStatus"></div>
       <div class="autosave-status" id="healthImportStatus"></div>
     </div>
@@ -2285,10 +2286,16 @@ window.clearAllData=async function(){
 
 
 window.runHealthShortcut=function(){
-  const shortcutName=encodeURIComponent('GLP-1 Health Import');
-  const status=document.getElementById('healthImportStatus');
-  if(status)status.textContent='Opening GLP-1 Health Import…';
-  window.location.href=`shortcuts://run-shortcut?name=${shortcutName}`;
+  const shortcutURL='shortcuts://run-shortcut?name=GLP-1%20Health%20Import';
+
+  // Web-only workflow: launch Shortcuts immediately.
+  // Do not save, show a loading mask, read the clipboard, or perform any async work first.
+  try{
+    window.location.href=shortcutURL;
+  }catch(error){
+    console.error('Shortcut launch failed',error);
+    alert('Could not open the GLP-1 Health Import Shortcut.');
+  }
 }
 
 window.showHealthImportHelp=function(){
@@ -3079,6 +3086,6 @@ init();
   </div>
 </div>
 
-<div class="app-version-badge">v18.3</div>
+<div class="app-version-badge">v18.4</div>
 </body>
 </html>
