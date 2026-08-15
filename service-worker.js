@@ -1,4 +1,4 @@
-const CACHE='glp1-tracker-v19-5-game-cloud-history';
+const CACHE='glp1-tracker-v19-6-game-startup-sync';
 const ASSETS=[
   './',
   './index.html',
